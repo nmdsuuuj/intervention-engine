@@ -45,14 +45,18 @@ class InterventionEngine {
 
   Future<List<Note>> applyTechnique(
     List<Note> originalNotes,
-    String techniqueId,
-  ) async {
+    String techniqueId, {
+    required double bpm,
+  }) async {
     await loadTechniques();
     switch (techniqueId) {
       case 'TECH_001':
         return _applyPaulStyleOctaveLeaps(originalNotes);
       case 'TECH_002':
-        return _applyJDillaGroove(originalNotes);
+        return _applyJDillaGroove(
+          originalNotes,
+          bpm: bpm,
+        );
       default:
         // ひとまずその他の技法は変化なし（スタブ実装）
         return originalNotes
@@ -73,16 +77,20 @@ class InterventionEngine {
         .toList(growable: false);
   }
 
-  List<Note> _applyJDillaGroove(List<Note> originalNotes) {
-    const double assumedBeatDurationMs = 60000 / 120; // TODO: BPM連動に更新する
+  List<Note> _applyJDillaGroove(
+    List<Note> originalNotes, {
+    required double bpm,
+  }) {
+    final currentBpm = max(bpm, 1.0);
+    final beatDurationMs = 60000 / currentBpm;
     final random = _randomPool.putIfAbsent('TECH_002', Random.new);
 
     return originalNotes
         .map((note) {
           final delayMs = random.nextInt(16) + 5; // 5〜20ms
-          final originalMs = note.startBeat * assumedBeatDurationMs;
+          final originalMs = note.startBeat * beatDurationMs;
           final shiftedBeat =
-              (originalMs + delayMs) / assumedBeatDurationMs;
+              (originalMs + delayMs) / beatDurationMs;
           return note.copyWith(startBeat: shiftedBeat);
         })
         .toList(growable: false);

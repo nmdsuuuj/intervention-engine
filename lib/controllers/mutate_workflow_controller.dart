@@ -80,8 +80,11 @@ class MutateWorkflowController extends ChangeNotifier {
       _activeTechnique = technique;
       _originalSnapshot =
           pianoRollController.selectedNotes.map((note) => note.copyWith()).toList();
-      final mutated =
-          await engine.applyTechnique(_originalSnapshot!, technique.id);
+      final mutated = await engine.applyTechnique(
+        _originalSnapshot!,
+        technique.id,
+        bpm: songState.bpm,
+      );
       _previewNotes = mutated;
       pianoRollController.setPreviewNotes(mutated);
       await audioPreviewService.playLoop(
