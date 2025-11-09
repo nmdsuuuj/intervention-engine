@@ -51,6 +51,8 @@ class InterventionEngine {
     switch (techniqueId) {
       case 'TECH_001':
         return _applyPaulStyleOctaveLeaps(originalNotes);
+      case 'TECH_002':
+        return _applyJDillaGroove(originalNotes);
       default:
         // ひとまずその他の技法は変化なし（スタブ実装）
         return originalNotes
@@ -67,6 +69,21 @@ class InterventionEngine {
           final shifted =
               (note.pitch + direction * 12).clamp(0, 127).toInt();
           return note.copyWith(pitch: shifted);
+        })
+        .toList(growable: false);
+  }
+
+  List<Note> _applyJDillaGroove(List<Note> originalNotes) {
+    const double assumedBeatDurationMs = 60000 / 120; // TODO: BPM連動に更新する
+    final random = _randomPool.putIfAbsent('TECH_002', Random.new);
+
+    return originalNotes
+        .map((note) {
+          final delayMs = random.nextInt(16) + 5; // 5〜20ms
+          final originalMs = note.startBeat * assumedBeatDurationMs;
+          final shiftedBeat =
+              (originalMs + delayMs) / assumedBeatDurationMs;
+          return note.copyWith(startBeat: shiftedBeat);
         })
         .toList(growable: false);
   }
