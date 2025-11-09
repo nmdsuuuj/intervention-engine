@@ -36,6 +36,7 @@ class TrackViewScreen extends StatelessWidget {
               child: _PianoRollArea(
                 songState: songState,
                 pianoRollController: pianoRollController,
+                mutateController: mutateController,
               ),
             ),
             SizedBox(
@@ -172,17 +173,23 @@ class _PianoRollArea extends StatelessWidget {
   const _PianoRollArea({
     required this.songState,
     required this.pianoRollController,
+    required this.mutateController,
   });
 
   final SongState songState;
   final PianoRollController pianoRollController;
+  final MutateWorkflowController mutateController;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _TrackHeader(pianoRollController: pianoRollController),
+        _TrackHeader(
+          songState: songState,
+          pianoRollController: pianoRollController,
+          mutateController: mutateController,
+        ),
         Expanded(
           child: _PianoRollMock(
             songState: songState,
@@ -196,13 +203,22 @@ class _PianoRollArea extends StatelessWidget {
 
 class _TrackHeader extends StatelessWidget {
   const _TrackHeader({
+    required this.songState,
     required this.pianoRollController,
+    required this.mutateController,
   });
 
+  final SongState songState;
   final PianoRollController pianoRollController;
+  final MutateWorkflowController mutateController;
 
   @override
   Widget build(BuildContext context) {
+    final tracks = songState.tracks;
+    if (tracks.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final selectedTrackId = pianoRollController.trackId;
     return ColoredBox(
       color: Theme.of(context).colorScheme.surface,
       child: Padding(
@@ -211,32 +227,42 @@ class _TrackHeader extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             ToggleButtons(
-              isSelected: const [true, false, false, false],
-              children: const [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('Dr'),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('Ba'),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('Ch'),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('Me'),
-                ),
-              ],
-              onPressed: (_) {},
+              isSelected: tracks
+                  .map((track) => track.id == selectedTrackId)
+                  .toList(growable: false),
+              children: tracks
+                  .map(
+                    (track) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        (track.name.length >= 2
+                                ? track.name.substring(0, 2)
+                                : track.name)
+                            .toUpperCase(),
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+              onPressed: (index) {
+                if (index < 0 || index >= tracks.length) return;
+                final track = tracks[index];
+                if (track.id == pianoRollController.trackId) return;
+                mutateController.cancelPreview();
+                pianoRollController.trackId = track.id;
+                pianoRollController.contextType = track.contextType;
+                pianoRollController.clearSelection();
+                pianoRollController.clearPreviewNotes();
+              },
             ),
             AnimatedBuilder(
               animation: pianoRollController,
               builder: (context, _) {
+                final currentTrack =
+                    songState.trackById(pianoRollController.trackId);
                 return Text(
-                  'トラック: ${pianoRollController.trackId} | コンテキスト: ${pianoRollController.contextType}',
+                  currentTrack == null
+                      ? 'トラック: ${pianoRollController.trackId}'
+                      : 'トラック: ${currentTrack.name} | コンテキスト: ${currentTrack.contextType}',
                 );
               },
             ),

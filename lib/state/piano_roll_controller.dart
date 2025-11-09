@@ -7,11 +7,21 @@ import '../models/note.dart';
 /// ピアノロール画面における選択状態とプレビュー表示を管理するコントローラ。
 class PianoRollController extends ChangeNotifier {
   PianoRollController({
-    required this.trackId,
+    required String trackId,
     required String contextType,
-  }) : _contextType = contextType;
+  })  : _trackId = trackId,
+        _contextType = contextType;
 
-  final String trackId;
+  String _trackId;
+  String get trackId => _trackId;
+
+  set trackId(String value) {
+    if (value == _trackId) return;
+    _trackId = value;
+    _selectedNotes.clear();
+    _previewNotes = null;
+    notifyListeners();
+  }
 
   String _contextType;
   final List<Note> _selectedNotes = [];

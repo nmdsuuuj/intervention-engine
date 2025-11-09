@@ -57,11 +57,21 @@ class MutateWorkflowController extends ChangeNotifier {
       notifyListeners();
       return const [];
     }
+    final track = songState.trackById(pianoRollController.trackId);
+    if (track == null) {
+      _suggestions
+        ..clear();
+      notifyListeners();
+      return const [];
+    }
+    if (pianoRollController.contextType != track.contextType) {
+      pianoRollController.contextType = track.contextType;
+    }
     _setBusy(true);
     try {
       final list = await engine.getApplicableTechniques(
         selected,
-        pianoRollController.contextType,
+        contextType: track.contextType,
       );
       _suggestions
         ..clear()

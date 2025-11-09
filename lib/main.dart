@@ -8,6 +8,7 @@ import 'state/piano_roll_controller.dart';
 import 'state/song_state.dart';
 import 'state/undo_manager.dart';
 import 'ui/screens/track_view_screen.dart';
+import 'models/track.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,14 +33,14 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
   @override
   void initState() {
     super.initState();
+    final initialTracks = _createInitialTracks();
+    final defaultTrack = initialTracks.first;
     _pianoRollController = PianoRollController(
-      trackId: 'bass',
-      contextType: 'bass_melody',
+      trackId: defaultTrack.id,
+      contextType: defaultTrack.contextType,
     );
     _songState = SongState(
-      initialTracks: {
-        'bass': _createInitialNotes(),
-      },
+      initialTracks: initialTracks,
       bpm: 120,
     );
     _undoManager = UndoManager();
@@ -87,12 +88,40 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
     );
   }
 
-  List<Note> _createInitialNotes() {
+  List<Track> _createInitialTracks() {
     return [
-      const Note(id: 'n1', pitch: 36, startBeat: 0, duration: 1, velocity: 96),
-      const Note(id: 'n2', pitch: 43, startBeat: 1, duration: 1, velocity: 96),
-      const Note(id: 'n3', pitch: 48, startBeat: 2, duration: 1, velocity: 96),
-      const Note(id: 'n4', pitch: 55, startBeat: 3, duration: 1, velocity: 96),
+      Track(
+        id: 'drums',
+        name: 'Drums',
+        contextType: 'drum_groove',
+        notes: const [
+          Note(id: 'd1', pitch: 36, startBeat: 0, duration: 0.5, velocity: 100),
+          Note(id: 'd2', pitch: 38, startBeat: 1, duration: 0.5, velocity: 100),
+          Note(id: 'd3', pitch: 42, startBeat: 2, duration: 0.5, velocity: 96),
+          Note(id: 'd4', pitch: 38, startBeat: 3, duration: 0.5, velocity: 96),
+        ],
+      ),
+      Track(
+        id: 'bass',
+        name: 'Bass',
+        contextType: 'bass_melody',
+        notes: const [
+          Note(id: 'b1', pitch: 36, startBeat: 0, duration: 1, velocity: 96),
+          Note(id: 'b2', pitch: 43, startBeat: 1, duration: 1, velocity: 96),
+          Note(id: 'b3', pitch: 48, startBeat: 2, duration: 1, velocity: 96),
+          Note(id: 'b4', pitch: 55, startBeat: 3, duration: 1, velocity: 96),
+        ],
+      ),
+      Track(
+        id: 'chords',
+        name: 'Chords',
+        contextType: 'chord_mutate',
+        notes: const [
+          Note(id: 'c1', pitch: 60, startBeat: 0, duration: 2, velocity: 90),
+          Note(id: 'c2', pitch: 64, startBeat: 0, duration: 2, velocity: 90),
+          Note(id: 'c3', pitch: 67, startBeat: 0, duration: 2, velocity: 90),
+        ],
+      ),
     ];
   }
 }

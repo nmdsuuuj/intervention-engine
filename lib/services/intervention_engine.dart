@@ -19,6 +19,7 @@ class InterventionEngine {
 
   List<Technique>? _cachedTechniques;
   final Map<String, Random> _randomPool = {};
+  int _tensionNoteCounter = 0;
 
   Future<void> loadTechniques() async {
     if (_cachedTechniques != null) return;
@@ -30,16 +31,19 @@ class InterventionEngine {
   }
 
   Future<List<Technique>> getApplicableTechniques(
-    List<Note> selectedNotes,
-    String contextType,
-  ) async {
+    List<Note> _selectedNotes, {
+    required String contextType,
+  }) async {
     await loadTechniques();
     final cache = _cachedTechniques ?? const [];
     if (contextType.isEmpty) {
       return cache;
     }
     return cache
-        .where((technique) => technique.type == contextType)
+        .where(
+          (technique) =>
+              technique.type == contextType || technique.type == 'any',
+        )
         .toList(growable: false);
   }
 
@@ -57,6 +61,8 @@ class InterventionEngine {
           originalNotes,
           bpm: bpm,
         );
+      case 'TECH_003':
+        return _applyAddTensionNotes(originalNotes);
       default:
         // ひとまずその他の技法は変化なし（スタブ実装）
         return originalNotes
@@ -94,5 +100,33 @@ class InterventionEngine {
           return note.copyWith(startBeat: shiftedBeat);
         })
         .toList(growable: false);
+  }
+
+  List<Note> _applyAddTensionNotes(List<Note> originalNotes) {
+    if (originalNotes.isEmpty) {
+      return originalNotes
+          .map((note) => note.copyWith())
+          .toList(growable: false);
+    }
+    final random = _randomPool.putIfAbsent('TECH_003', Random.new);
+    final mutated =
+        originalNotes.map((note) => note.copyWith()).toList(growable: true);
+    final highest = mutated.reduce(
+      (current, note) => note.pitch > current.pitch ? note : current,
+    );
+    final interval = random.nextBool() ? 1 : 2;
+    final tensionPitch =
+        (highest.pitch + interval).clamp(0, 127).toInt();
+    final tensionVelocity =
+        min(highest.velocity + 10, 127);
+    final newNote = Note(
+      id: 'tech003_${_tensionNoteCounter++}',
+      pitch: tensionPitch,
+      startBeat: highest.startBeat,
+      duration: highest.duration,
+      velocity: tensionVelocity,
+    );
+    mutated.add(newNote);
+    return mutated;
   }
 }
