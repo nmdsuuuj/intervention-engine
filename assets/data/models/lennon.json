@@ -1,0 +1,29 @@
+{
+  "model_name": "The Dreamer (ジョン・レノン)",
+  "description": "シンプルなコード進行に、突発的な拍の変化やロックンロールのコードを加える。",
+  "artist_hint_triggers": [
+    {
+      "condition": "4/4_loop_over_8_bars",
+      "hint_text": "退屈ですね。この小節だけ1拍減らして (7/8拍子に) みませんか？",
+      "action_id": "elasticBar_removeBeat"
+    }
+  ],
+  "mutation_techniques": [
+    {
+      "intensity_min": 10,
+      "id": "elasticBar_removeBeat"
+    },
+    {
+      "intensity_min": 30,
+      "id": "rock_bVII_injection"
+    },
+    {
+      "intensity_min": 50,
+      "id": "rule_harmony_borrowed_iv"
+    },
+    {
+      "intensity_min": 70,
+      "id": "rule_tension_b9_noResolve"
+    }
+  ]
+}
