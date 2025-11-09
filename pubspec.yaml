@@ -19,4 +19,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/data/techniques.json
-    - assets/sounds/placeholder.sf2
+    - assets/sounds/tim_gm.sf2
