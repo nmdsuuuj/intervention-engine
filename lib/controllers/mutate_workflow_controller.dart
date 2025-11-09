@@ -76,6 +76,7 @@ class MutateWorkflowController extends ChangeNotifier {
     if (!pianoRollController.hasSelection) return;
     _setBusy(true);
     try {
+      audioPreviewService.stopLoop();
       _activeTechnique = technique;
       _originalSnapshot =
           pianoRollController.selectedNotes.map((note) => note.copyWith()).toList();
@@ -83,7 +84,10 @@ class MutateWorkflowController extends ChangeNotifier {
           await engine.applyTechnique(_originalSnapshot!, technique.id);
       _previewNotes = mutated;
       pianoRollController.setPreviewNotes(mutated);
-      await audioPreviewService.playLoop(mutated);
+      await audioPreviewService.playLoop(
+        mutated,
+        bpm: songState.bpm,
+      );
       notifyListeners();
     } finally {
       _setBusy(false);
@@ -91,8 +95,8 @@ class MutateWorkflowController extends ChangeNotifier {
   }
 
   void cancelPreview() {
+    audioPreviewService.stopLoop();
     if (_previewNotes == null) return;
-    audioPreviewService.stop();
     _previewNotes = null;
     _activeTechnique = null;
     pianoRollController.clearPreviewNotes();
@@ -139,7 +143,7 @@ class MutateWorkflowController extends ChangeNotifier {
 
     pianoRollController.updateSelection(mutated);
     pianoRollController.clearPreviewNotes();
-    audioPreviewService.stop();
+    audioPreviewService.stopLoop();
     _previewNotes = null;
     _originalSnapshot = null;
     _activeTechnique = null;

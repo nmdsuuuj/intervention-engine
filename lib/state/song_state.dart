@@ -6,13 +6,16 @@ import '../models/note.dart';
 class SongState extends ChangeNotifier {
   SongState({
     Map<String, List<Note>>? initialTracks,
-  }) : _trackNotes = initialTracks != null
+    double bpm = 120,
+  })  : _trackNotes = initialTracks != null
             ? initialTracks.map(
                 (key, value) => MapEntry(key, List<Note>.from(value)),
               )
-            : {};
+            : {},
+        _bpm = bpm;
 
   final Map<String, List<Note>> _trackNotes;
+  double _bpm;
 
   List<Note> notesForTrack(String trackId) {
     return List<Note>.from(_trackNotes[trackId] ?? const []);
@@ -35,6 +38,14 @@ class SongState extends ChangeNotifier {
     filtered.addAll(insertNotes);
     filtered.sort((a, b) => a.startBeat.compareTo(b.startBeat));
     _trackNotes[trackId] = filtered;
+    notifyListeners();
+  }
+
+  double get bpm => _bpm;
+
+  set bpm(double value) {
+    if (value == _bpm) return;
+    _bpm = value;
     notifyListeners();
   }
 }

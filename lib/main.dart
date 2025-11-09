@@ -40,10 +40,13 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
       initialTracks: {
         'bass': _createInitialNotes(),
       },
+      bpm: 120,
     );
     _undoManager = UndoManager();
     _engine = InterventionEngine();
-    _audioPreviewService = AudioPreviewService();
+    _audioPreviewService = AudioPreviewService(
+      soundFontAsset: 'assets/sounds/placeholder.sf2',
+    );
     _mutateController = MutateWorkflowController(
       pianoRollController: _pianoRollController,
       songState: _songState,
@@ -51,10 +54,13 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
       undoManager: _undoManager,
       audioPreviewService: _audioPreviewService,
     );
+
+    Future.microtask(() => _audioPreviewService.init());
   }
 
   @override
   void dispose() {
+    _audioPreviewService.stopLoop();
     _mutateController.dispose();
     _pianoRollController.dispose();
     _songState.dispose();
