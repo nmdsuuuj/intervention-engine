@@ -114,7 +114,8 @@ class InterventionEngine {
     final highest = mutated.reduce(
       (current, note) => note.pitch > current.pitch ? note : current,
     );
-    final interval = random.nextBool() ? 1 : 2;
+    final safeIntervals = [2, 7, 14];
+    final interval = safeIntervals[random.nextInt(safeIntervals.length)];
     final tensionPitch =
         (highest.pitch + interval).clamp(0, 127).toInt();
     final tensionVelocity =
