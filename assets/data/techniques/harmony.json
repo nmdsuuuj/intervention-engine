@@ -1,0 +1,42 @@
+[
+  {
+    "id": "rock_bVII_injection",
+    "name": "ロックンロール bVII 介入",
+    "description": "キー（例：C）に対し、ロックンロール的な響き（例：Bb）を介入させる。",
+    "type": "HARMONY_SUBSTITUTE",
+    "parameters": {
+      "target_key_relation": "I",
+      "replace_with_relation": "bVII"
+    }
+  },
+  {
+    "id": "rule_voiceLeading_bIII",
+    "name": "声部連結による bIII 介入",
+    "description": "I (例: A) から bIII (例: C) へ滑らかに進行する。",
+    "type": "HARMONY_GENERATE",
+    "parameters": {
+      "from_chord": "I",
+      "to_chord": "bIII",
+      "voice_leading_rule": "3rd_to_root_chromatic"
+    }
+  },
+  {
+    "id": "rule_harmony_borrowed_iv",
+    "name": "曖昧なマイナーiv介入",
+    "description": "メジャーキーのIV（例：F）をiv（Fm）に置き換える。",
+    "type": "HARMONY_SUBSTITUTE",
+    "parameters": {
+      "target_key_relation": "IV",
+      "replace_with_relation": "iv"
+    }
+  },
+  {
+    "id": "pattern_mccartney_fill_01",
+    "name": "ポール風フィル (ベース奏法)",
+    "description": "G-A-Bb-B-Cと上がるメロディックなベースフィル。",
+    "type": "BASS_ARTICULATION_PATTERN",
+    "parameters": {
+      "midi_data": "..." // 実際のMIDIデータ（またはそれを生成するロジック）
+    }
+  }
+]
