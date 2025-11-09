@@ -1,0 +1,29 @@
+[
+  {
+    "id": "groove_j_dilla_lazy",
+    "name": "J Dilla (Lazy)",
+    "description": "拍の「オモテ」も「ウラ」もランダムに後ろにヨレる。",
+    "type": "GROOVE_TEMPLATE",
+    "parameters": {
+      "intensity_max_ms": 40 
+    }
+  },
+  {
+    "id": "groove_shuffle_8th",
+    "name": "Shuffle (8th)",
+    "description": "8分音符が3連符のように「跳ねる」。",
+    "type": "GROOVE_TEMPLATE",
+    "parameters": {
+      "ratio": "2:1"
+    }
+  },
+  {
+    "id": "groove_nudge_layback",
+    "name": "Nudge (Layback)",
+    "description": "全体を10ミリ秒だけ「後」にモタる。",
+    "type": "GROOVE_NUDGE",
+    "parameters": {
+      "shift_ms": 10 
+    }
+  }
+]
