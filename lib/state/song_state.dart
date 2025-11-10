@@ -19,6 +19,7 @@ class SongState extends ChangeNotifier {
   final Map<String, Track> _tracks;
   final List<Note> _clipboard = [];
   int _clipboardInsertCounter = 0;
+  int _noteIdCounter = 0;
   double _bpm;
   double _playheadBeat = 0;
 
@@ -52,14 +53,17 @@ class SongState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addNotes(String trackId, List<Note> notes) {
+  List<Note> addNotes(String trackId, List<Note> notes) {
     final track = _tracks[trackId];
-    if (track == null || notes.isEmpty) return;
+    if (track == null || notes.isEmpty) return const [];
+    final clones =
+        notes.map((note) => note.copyWith()).toList(growable: false);
     final updated = List<Note>.from(track.notes)
-      ..addAll(notes.map((note) => note.copyWith()))
+      ..addAll(clones)
       ..sort((a, b) => a.startBeat.compareTo(b.startBeat));
     _tracks[trackId] = track.copyWith(notes: updated);
     notifyListeners();
+    return clones;
   }
 
   List<Note> removeNotes(String trackId, List<Note> notes) {
@@ -103,8 +107,8 @@ class SongState extends ChangeNotifier {
         velocity: note.velocity,
       );
     }).toList(growable: false);
-    addNotes(trackId, pasted);
-    return pasted;
+    final stored = addNotes(trackId, pasted);
+    return stored.isEmpty ? pasted : stored;
   }
 
   void copyToClipboard(List<Note> notes) {
@@ -148,4 +152,17 @@ class SongState extends ChangeNotifier {
   List<Track> get tracks => _tracks.values
       .map((track) => track.copyWith())
       .toList(growable: false);
+
+  String generateNoteId() => 'note_${_noteIdCounter++}';
+
+  Note? findNoteById(String trackId, String noteId) {
+    final track = _tracks[trackId];
+    if (track == null) return null;
+    for (final note in track.notes) {
+      if (note.id == noteId) {
+        return note.copyWith();
+      }
+    }
+    return null;
+  }
 }

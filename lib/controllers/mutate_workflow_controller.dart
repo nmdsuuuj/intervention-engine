@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -56,6 +57,9 @@ class MutateWorkflowController extends ChangeNotifier {
       !_isBusy;
 
   bool get canDelete => canCopy;
+
+  Note? _resizeOriginal;
+  Note? _resizeWorking;
 
   void _handleSelectionChanged() {
     notifyListeners();
@@ -198,8 +202,10 @@ class MutateWorkflowController extends ChangeNotifier {
       UndoEntry(
         description: '[Cut] ${removed.length} notes',
         undo: () {
-          songState.addNotes(trackId, removedForUndo);
-          pianoRollController.updateSelection(removedForUndo);
+          final restored = songState.addNotes(trackId, removedForUndo);
+          pianoRollController.updateSelection(
+            restored.isNotEmpty ? restored : removedForUndo,
+          );
         },
         redo: () {
           songState.removeNotes(trackId, removedForUndo);
@@ -224,8 +230,10 @@ class MutateWorkflowController extends ChangeNotifier {
       UndoEntry(
         description: '[Delete] ${removed.length} notes',
         undo: () {
-          songState.addNotes(trackId, removedForUndo);
-          pianoRollController.updateSelection(removedForUndo);
+          final restored = songState.addNotes(trackId, removedForUndo);
+          pianoRollController.updateSelection(
+            restored.isNotEmpty ? restored : removedForUndo,
+          );
         },
         redo: () {
           songState.removeNotes(trackId, removedForUndo);
@@ -253,12 +261,118 @@ class MutateWorkflowController extends ChangeNotifier {
           pianoRollController.clearSelection();
         },
         redo: () {
-          songState.addNotes(trackId, pastedForUndo);
-          pianoRollController.updateSelection(pastedForUndo);
+          final restored = songState.addNotes(trackId, pastedForUndo);
+          pianoRollController.updateSelection(
+            restored.isNotEmpty ? restored : pastedForUndo,
+          );
         },
       ),
     );
   }
+
+  void createNoteAt(double rawBeat, int pitch, {double defaultLength = 1.0}) {
+    if (!_isToolWritable) return;
+    final trackId = pianoRollController.trackId;
+    final snappedStart = pianoRollController.snapBeat(rawBeat);
+    double snappedEnd = pianoRollController.snapBeat(snappedStart + defaultLength);
+    if ((snappedEnd - snappedStart).abs() < 1e-3) {
+      snappedEnd = snappedStart + defaultLength;
+    }
+    final duration = math.max(0.125, snappedEnd - snappedStart);
+    final safePitch = math.max(0, math.min(127, pitch));
+    final newNote = Note(
+      id: songState.generateNoteId(),
+      pitch: safePitch,
+      startBeat: snappedStart,
+      duration: duration,
+      velocity: 96,
+    );
+    final inserted = songState.addNotes(trackId, [newNote]);
+    final stored = inserted.isNotEmpty ? inserted.first : newNote;
+    pianoRollController.updateSelection([stored]);
+    undoManager.push(
+      UndoEntry(
+        description: '[Draw] Add note',
+        undo: () {
+          songState.removeNotes(trackId, [stored]);
+          pianoRollController.clearSelection();
+        },
+        redo: () {
+          final restored = songState.addNotes(trackId, [stored]);
+          final redoNote = restored.isNotEmpty ? restored.first : stored;
+          pianoRollController.updateSelection([redoNote]);
+        },
+      ),
+    );
+  }
+
+  void startNoteResize(Note note) {
+    if (!_isToolWritable) return;
+    _resizeOriginal = note.copyWith();
+    _resizeWorking = note.copyWith();
+  }
+
+  Note? updateNoteResize(Note currentReference, double rawEndBeat) {
+    if (!_isToolWritable || _resizeOriginal == null) return null;
+    final snappedEnd = pianoRollController.snapBeat(rawEndBeat);
+    double newDuration = math.max(
+      0.125,
+      snappedEnd - _resizeOriginal!.startBeat,
+    );
+    if ((newDuration - _resizeOriginal!.duration).abs() < 1e-3) {
+      return _resizeWorking;
+    }
+    final updated = _resizeOriginal!.copyWith(duration: newDuration);
+    final trackId = pianoRollController.trackId;
+    songState.replaceNotes(
+      trackId,
+      removeTargets: [currentReference],
+      insertNotes: [updated],
+    );
+    _resizeWorking = updated;
+    pianoRollController.updateSelection([updated]);
+    return updated;
+  }
+
+  void endNoteResize(Note finalReference) {
+    if (_resizeOriginal == null || _resizeWorking == null) {
+      _resizeOriginal = null;
+      _resizeWorking = null;
+      return;
+    }
+    final original = _resizeOriginal!;
+    final current = _resizeWorking!;
+    _resizeOriginal = null;
+    _resizeWorking = null;
+    if ((current.duration - original.duration).abs() < 1e-6 &&
+        (current.startBeat - original.startBeat).abs() < 1e-6) {
+      return;
+    }
+    final trackId = pianoRollController.trackId;
+    undoManager.push(
+      UndoEntry(
+        description: '[Draw] Resize note',
+        undo: () {
+          songState.replaceNotes(
+            trackId,
+            removeTargets: [current],
+            insertNotes: [original],
+          );
+          pianoRollController.updateSelection([original]);
+        },
+        redo: () {
+          songState.replaceNotes(
+            trackId,
+            removeTargets: [original],
+            insertNotes: [current],
+          );
+          pianoRollController.updateSelection([current]);
+        },
+      ),
+    );
+  }
+
+  bool get _isToolWritable => pianoRollController.isDrawToolActive && !_isBusy;
 
   void _setBusy(bool value) {
     if (_isBusy == value) return;

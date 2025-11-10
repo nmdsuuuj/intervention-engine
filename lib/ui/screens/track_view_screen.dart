@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../controllers/mutate_workflow_controller.dart';
@@ -6,6 +8,10 @@ import '../../state/piano_roll_controller.dart';
 import '../../state/song_state.dart';
 import '../../state/undo_manager.dart';
 import '../widgets/mutate_button.dart';
+
+const double _kTimelineBeats = 16.0;
+const double _kNoteRowHeight = 36.0;
+const int _kTopPitch = 84;
 
 class TrackViewScreen extends StatelessWidget {
   const TrackViewScreen({
@@ -397,9 +403,42 @@ class _PianoRollArea extends StatelessWidget {
           pianoRollController: pianoRollController,
         ),
         Expanded(
-          child: _PianoRollMock(
-            songState: songState,
-            pianoRollController: pianoRollController,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double timelineBeats = _kTimelineBeats;
+              final double timelineWidth = constraints.maxWidth;
+              final double viewHeight = constraints.maxHeight.isFinite
+                  ? constraints.maxHeight
+                  : _kNoteRowHeight * 16;
+              return GestureDetector(
+                behavior: HitTestBehavior.deferToChild,
+                onTapDown: (details) {
+                  if (!pianoRollController.isDrawToolActive ||
+                      mutateController.isBusy) {
+                    return;
+                  }
+                  final local = details.localPosition;
+                  final clampedDx = local.dx.clamp(0.0, timelineWidth);
+                  final rawBeat =
+                      (clampedDx / timelineWidth) * timelineBeats;
+                  final rows = math.max(
+                    1,
+                    (viewHeight / _kNoteRowHeight).floor(),
+                  );
+                  final rawRow = (local.dy / _kNoteRowHeight).floor();
+                  final rowClamped = rawRow.clamp(0, rows - 1);
+                  final pitch = (_kTopPitch - rowClamped).clamp(0, 127);
+                  mutateController.createNoteAt(rawBeat, pitch);
+                },
+                child: _PianoRollMock(
+                  songState: songState,
+                  pianoRollController: pianoRollController,
+                  mutateController: mutateController,
+                  timelineBeats: timelineBeats,
+                  timelineWidth: timelineWidth,
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -483,14 +522,23 @@ class _PianoRollMock extends StatelessWidget {
   const _PianoRollMock({
     required this.songState,
     required this.pianoRollController,
+    required this.mutateController,
+    required this.timelineBeats,
+    required this.timelineWidth,
   });
 
   final SongState songState;
   final PianoRollController pianoRollController;
+  final MutateWorkflowController mutateController;
+  final double timelineBeats;
+  final double timelineWidth;
 
   @override
   Widget build(BuildContext context) {
-    final animation = Listenable.merge([songState, pianoRollController]);
+    final animation =
+        Listenable.merge([songState, pianoRollController, mutateController]);
+    final beatPerPixel =
+        timelineWidth == 0 ? 0.0 : timelineBeats / timelineWidth;
     return AnimatedBuilder(
       animation: animation,
       builder: (context, _) {
@@ -501,65 +549,102 @@ class _PianoRollMock extends StatelessWidget {
             pianoRollController.previewNotes?.map((note) => note.id).toSet() ??
                 const <String>{};
 
-        return ListView.builder(
+          return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: notes.length,
           itemBuilder: (context, index) {
-              final note = notes[index];
-              final isSelected = selectedIds.contains(note.id);
-              final isPreview = previewIds.contains(note.id);
-              final playhead = songState.playheadBeat;
-              final isPlayheadActive =
-                  playhead >= note.startBeat &&
-                  playhead < note.startBeat + note.duration;
-              final Color backgroundColor;
-              if (isPreview) {
-                backgroundColor = Colors.orange.withOpacity(0.4);
-              } else if (isSelected) {
-                backgroundColor =
-                    Theme.of(context).colorScheme.primary.withOpacity(0.2);
-              } else if (isPlayheadActive) {
-                backgroundColor =
-                    Theme.of(context).colorScheme.secondaryContainer;
-              } else {
-                backgroundColor =
-                    Theme.of(context).colorScheme.surfaceVariant;
-              }
-              return GestureDetector(
-                onTap: () {
-                  final current = pianoRollController.selectedNotes.toList();
-                  if (isSelected) {
-                    current.removeWhere((n) => n.id == note.id);
-                  } else {
-                    current.add(note);
-                  }
-                  pianoRollController.updateSelection(current);
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: backgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : isPlayheadActive
-                              ? Theme.of(context).colorScheme.secondary
-                              : Colors.transparent,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Note ${note.id} | Pitch ${note.pitch}'),
-                      Text(
-                        'Start ${note.startBeat.toStringAsFixed(2)} / Len ${note.duration.toStringAsFixed(2)}',
-                      ),
-                    ],
+            final note = notes[index];
+            final isSelected = selectedIds.contains(note.id);
+            final isPreview = previewIds.contains(note.id);
+            final playhead = songState.playheadBeat;
+            final isPlayheadActive =
+                playhead >= note.startBeat &&
+                playhead < note.startBeat + note.duration;
+            final Color backgroundColor;
+            if (isPreview) {
+              backgroundColor = Colors.orange.withOpacity(0.4);
+            } else if (isSelected) {
+              backgroundColor =
+                  Theme.of(context).colorScheme.primary.withOpacity(0.2);
+            } else if (isPlayheadActive) {
+              backgroundColor =
+                  Theme.of(context).colorScheme.secondaryContainer;
+            } else {
+              backgroundColor =
+                  Theme.of(context).colorScheme.surfaceVariant;
+            }
+            final canSelect = pianoRollController.isSelectToolActive;
+            final canDraw = pianoRollController.isDrawToolActive;
+            final baseNote = note;
+            double dragDx = 0.0;
+            Note liveNote = note;
+            return GestureDetector(
+              onHorizontalDragStart: canDraw
+                  ? (_) {
+                      dragDx = 0.0;
+                      liveNote = baseNote;
+                      mutateController.startNoteResize(baseNote);
+                    }
+                  : null,
+              onHorizontalDragUpdate: canDraw
+                  ? (details) {
+                      dragDx += details.delta.dx;
+                      final deltaBeats = beatPerPixel * dragDx;
+                      final rawEndBeat =
+                          baseNote.startBeat + baseNote.duration + deltaBeats;
+                      final updated =
+                          mutateController.updateNoteResize(liveNote, rawEndBeat);
+                      if (updated != null) {
+                        liveNote = updated;
+                      }
+                    }
+                  : null,
+              onHorizontalDragEnd: canDraw
+                  ? (_) {
+                      mutateController.endNoteResize(liveNote);
+                    }
+                  : null,
+              onTap: canSelect
+                  ? () {
+                      final current = pianoRollController.selectedNotes.toList();
+                      if (isSelected) {
+                        current.removeWhere((n) => n.id == note.id);
+                      } else {
+                        current.add(note);
+                      }
+                      pianoRollController.updateSelection(current);
+                    }
+                  : () {
+                      if (canDraw) {
+                        songState.playheadBeat =
+                            pianoRollController.snapBeat(note.startBeat);
+                      }
+                    },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : isPlayheadActive
+                            ? Theme.of(context).colorScheme.secondary
+                            : Colors.transparent,
                   ),
                 ),
-              );
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Note ${note.id} | Pitch ${note.pitch}'),
+                    Text(
+                      'Start ${note.startBeat.toStringAsFixed(2)} / Len ${note.duration.toStringAsFixed(2)}',
+                    ),
+                  ],
+                ),
+              ),
+            );
           },
         );
       },
