@@ -309,7 +309,7 @@ class _SnapSelector extends StatelessWidget {
       height: 48,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.grid_on),
-                  label: 'SNAP: ${pianoRollController.snapMode.shortLabel}',
+        label: Text('SNAP: ${pianoRollController.snapMode.shortLabel}'),
         onPressed: () => _showSnapSheet(context),
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
