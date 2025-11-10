@@ -21,12 +21,18 @@ class TrackViewScreen extends StatelessWidget {
     required this.pianoRollController,
     required this.songState,
     required this.undoManager,
+    this.onBackPressed,
+    this.onSavePressed,
+    this.onHumPressed,
   });
 
   final MutateWorkflowController mutateController;
   final PianoRollController pianoRollController;
   final SongState songState;
   final UndoManager undoManager;
+  final VoidCallback? onBackPressed;
+  final VoidCallback? onSavePressed;
+  final VoidCallback? onHumPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +53,8 @@ class TrackViewScreen extends StatelessWidget {
                 controller: mutateController,
                 pianoRollController: pianoRollController,
                 songState: songState,
+                onBackPressed: onBackPressed,
+                onHumPressed: onHumPressed,
               ),
             ),
             Expanded(
@@ -61,6 +69,8 @@ class TrackViewScreen extends StatelessWidget {
               child: _RightThumbColumn(
                 undoManager: undoManager,
                 songState: songState,
+                pianoRollController: pianoRollController,
+                onSavePressed: onSavePressed,
               ),
             ),
           ],
@@ -75,11 +85,15 @@ class _LeftThumbColumn extends StatelessWidget {
     required this.controller,
     required this.pianoRollController,
     required this.songState,
+    this.onBackPressed,
+    this.onHumPressed,
   });
 
   final MutateWorkflowController controller;
   final PianoRollController pianoRollController;
   final SongState songState;
+  final VoidCallback? onBackPressed;
+  final VoidCallback? onHumPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +116,7 @@ class _LeftThumbColumn extends StatelessWidget {
                   _ThumbButton(
                     label: 'BACK',
                     icon: Icons.arrow_back,
-                    onPressed: () {},
+                    onPressed: onBackPressed,
                   ),
                   const SizedBox(height: 4),
                   _ThumbButton(
@@ -174,7 +188,7 @@ class _LeftThumbColumn extends StatelessWidget {
                   _ThumbButton(
                     label: 'HUM',
                     icon: Icons.mic,
-                    onPressed: () {},
+                    onPressed: onHumPressed,
                   ),
                 ],
               ),
@@ -190,10 +204,14 @@ class _RightThumbColumn extends StatelessWidget {
   const _RightThumbColumn({
     required this.undoManager,
     required this.songState,
+    required this.pianoRollController,
+    this.onSavePressed,
   });
 
   final UndoManager undoManager;
   final SongState songState;
+  final PianoRollController pianoRollController;
+  final VoidCallback? onSavePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -205,9 +223,16 @@ class _RightThumbColumn extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _ThumbButton(label: 'GUIDE', icon: Icons.visibility, onPressed: () {}),
+              _ThumbButton(
+                label: pianoRollController.guideVisible ? 'GUIDE ON' : 'GUIDE',
+                icon: Icons.visibility,
+                isActive: pianoRollController.guideVisible,
+                onPressed: () {
+                  pianoRollController.guideVisible = !pianoRollController.guideVisible;
+                },
+              ),
               const SizedBox(height: 4),
-              _ThumbButton(label: 'SAVE', icon: Icons.save, onPressed: () {}),
+              _ThumbButton(label: 'SAVE', icon: Icons.save, onPressed: onSavePressed),
               const SizedBox(height: 4),
               _ThumbButton(
                 label: songState.metronomeEnabled ? 'METRO ON' : 'METRO',
@@ -786,6 +811,11 @@ class PianoRollPainter extends CustomPainter {
   }
 
   void _drawGrid(Canvas canvas, Size size, _ThemeColors theme) {
+    if (!pianoRollController.guideVisible) {
+      // ガイドが無効な場合は背景のみ描画
+      return;
+    }
+    
     final beatPerPixel = timelineWidth == 0 ? 0.0 : timelineBeats / timelineWidth;
     
     // 小節線（太線、4拍ごと）

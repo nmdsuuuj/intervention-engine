@@ -30,6 +30,7 @@ class PianoRollController extends ChangeNotifier {
   EditorTool _editorTool = EditorTool.select;
   SnapMode _snapMode = SnapMode.beat;
   int _octaveOffset = 0;
+  bool _guideVisible = true;
   final List<Note> _selectedNotes = [];
   List<Note>? _previewNotes;
 
@@ -44,6 +45,13 @@ class PianoRollController extends ChangeNotifier {
   set octaveOffset(int value) {
     if (value == _octaveOffset) return;
     _octaveOffset = value.clamp(-48, 48); // -4オクターブから+4オクターブ
+    notifyListeners();
+  }
+
+  bool get guideVisible => _guideVisible;
+  set guideVisible(bool value) {
+    if (value == _guideVisible) return;
+    _guideVisible = value;
     notifyListeners();
   }
 

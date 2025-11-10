@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'controllers/mutate_workflow_controller.dart';
 import 'models/note.dart';
@@ -83,6 +85,12 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
           pianoRollController: _pianoRollController,
           songState: _songState,
           undoManager: _undoManager,
+          onBackPressed: () {
+            // TODO: 前の画面に戻る機能を実装
+            Navigator.of(context).pop();
+          },
+          onSavePressed: () => _handleSave(context),
+          onHumPressed: () => _handleHum(context),
         ),
       ),
     );
@@ -123,5 +131,45 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
         ],
       ),
     ];
+  }
+
+  Future<void> _handleSave(BuildContext context) async {
+    try {
+      final jsonData = _songState.toJson();
+      final jsonString = const JsonEncoder.withIndent('  ').convert(jsonData);
+      
+      // クリップボードにコピー（実際のアプリではファイル保存に変更）
+      await Clipboard.setData(ClipboardData(text: jsonString));
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saved to clipboard'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Save failed: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleHum(BuildContext context) async {
+    // TODO: 鼻歌録音機能を実装
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('HUM feature coming soon'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }

@@ -239,14 +239,20 @@ class SongState extends ChangeNotifier {
 
   String generateNoteId() => 'note_${_noteIdCounter++}';
 
-  Note? findNoteById(String trackId, String noteId) {
-    final track = _tracks[trackId];
-    if (track == null) return null;
-    for (final note in track.notes) {
-      if (note.id == noteId) {
-        return note.copyWith();
-      }
-    }
-    return null;
+  Map<String, dynamic> toJson() {
+    return {
+      'tracks': _tracks.values.map((track) => track.toJson()).toList(),
+      'bpm': _bpm,
+      'playheadBeat': _playheadBeat,
+    };
   }
-}
+
+  static SongState fromJson(Map<String, dynamic> json) {
+    final tracks = (json['tracks'] as List)
+        .map((t) => Track.fromJson(t as Map<String, dynamic>))
+        .toList();
+    return SongState(
+      initialTracks: tracks,
+      bpm: (json['bpm'] as num?)?.toDouble() ?? 120,
+    )..playheadBeat = (json['playheadBeat'] as num?)?.toDouble() ?? 0.0;
+  }

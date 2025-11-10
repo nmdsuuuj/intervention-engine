@@ -49,4 +49,24 @@ class Track {
         contextType,
         const DeepCollectionEquality().hash(notes),
       );
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'contextType': contextType,
+      'notes': notes.map((note) => note.toJson()).toList(),
+    };
+  }
+
+  static Track fromJson(Map<String, dynamic> json) {
+    return Track(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      contextType: json['contextType'] as String,
+      notes: (json['notes'] as List)
+          .map((n) => Note.fromJson(n as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
