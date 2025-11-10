@@ -25,6 +25,7 @@ class AudioPreviewService {
   bool _initialized = false;
   bool _isLooping = false;
   Timer? _sequencerTimer;
+  final Set<String> _activeNoteIds = {}; // 再生中のノートIDを追跡（重複防止用）
 
   double _bpm = 120;
   double _beatDurationMs = 500; // 120 BPM の場合
@@ -106,6 +107,7 @@ class AudioPreviewService {
     _isLooping = false;
     _positionMs = 0;
     _scheduledNotes.clear();
+    _activeNoteIds.clear(); // 再生中のノートをクリア
   }
 
   _ScheduledNote _mapNote(Note note) {
@@ -195,12 +197,16 @@ class AudioPreviewService {
 
   /// 単一のノートを再生（再生ヘッド用）
   void playNote(Note note) {
+    // 既に再生中のノートはスキップ（重複防止）
+    if (_activeNoteIds.contains(note.id)) return;
+    
     try {
       _midi.playMidiNote(
         midi: note.pitch,
         velocity: note.velocity,
         channel: _midiChannel,
       );
+      _activeNoteIds.add(note.id);
     } catch (e) {
       print('Warning: Could not play MIDI note: $e');
     }
@@ -208,13 +214,39 @@ class AudioPreviewService {
 
   /// 単一のノートを停止（再生ヘッド用）
   void stopNote(Note note) {
+    if (!_activeNoteIds.contains(note.id)) return;
+    
     try {
       _midi.stopMidiNote(
         midi: note.pitch,
         channel: _midiChannel,
       );
+      _activeNoteIds.remove(note.id);
     } catch (e) {
       print('Warning: Could not stop MIDI note: $e');
+    }
+  }
+
+  /// メトロノームの音を再生（拍子の1拍目は高音、それ以外は低音）
+  void playMetronomeTick({bool isDownBeat = false}) {
+    try {
+      // 1拍目は高音（C5 = 72）、それ以外は低音（C4 = 60）
+      final pitch = isDownBeat ? 72 : 60;
+      _midi.playMidiNote(
+        midi: pitch,
+        velocity: isDownBeat ? 100 : 80,
+        channel: _midiChannel,
+      );
+      // メトロノームの音は短く再生（100ms後に停止）
+      Future.delayed(const Duration(milliseconds: 100), () {
+        try {
+          _midi.stopMidiNote(midi: pitch, channel: _midiChannel);
+        } catch (e) {
+          // エラーは無視
+        }
+      });
+    } catch (e) {
+      print('Warning: Could not play metronome tick: $e');
     }
   }
 }

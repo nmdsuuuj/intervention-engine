@@ -30,6 +30,9 @@ class SongState extends ChangeNotifier {
   Timer? _playTimer;
   Timer? _metronomeTimer;
   AudioPreviewService? _audioService;
+  double _lastPlayBeat = 0.0; // 前回の再生ビート位置を保持
+  final Set<String> _activeNoteIds = {}; // 現在再生中のノートIDを追跡
+  int _metronomeBeatCount = 0; // メトロノームの拍カウント
 
   void setAudioService(AudioPreviewService? service) {
     _audioService = service;
@@ -172,13 +175,17 @@ class SongState extends ChangeNotifier {
 
   void _startMetronome() {
     _metronomeTimer?.cancel();
+    _metronomeBeatCount = 0;
     final beatInterval = Duration(milliseconds: (60000 / _bpm).round());
     _metronomeTimer = Timer.periodic(beatInterval, (timer) {
       if (!_metronomeEnabled) {
         timer.cancel();
         return;
       }
-      // メトロノームの音を鳴らす（実際の音声再生は後で実装）
+      // メトロノームの音を鳴らす
+      final isDownBeat = _metronomeBeatCount % 4 == 0; // 4拍子の1拍目
+      _audioService?.playMetronomeTick(isDownBeat: isDownBeat);
+      _metronomeBeatCount++;
       notifyListeners();
     });
   }
@@ -200,6 +207,8 @@ class SongState extends ChangeNotifier {
     if (_isPlaying) return;
     _isPlaying = true;
     _playTimer?.cancel();
+    _lastPlayBeat = _playheadBeat; // 現在の位置を初期値に
+    _activeNoteIds.clear(); // 再生中のノートをクリア
     final beatsPerSecond = _bpm / 60.0;
     final updateInterval = const Duration(milliseconds: 50); // 20fps
     _playTimer = Timer.periodic(updateInterval, (timer) {
@@ -211,6 +220,8 @@ class SongState extends ChangeNotifier {
       final newBeat = _playheadBeat + deltaBeats;
       if (newBeat >= 64.0) {
         _playheadBeat = 0.0;
+        _lastPlayBeat = 0.0;
+        _activeNoteIds.clear();
         stop();
       } else {
         _playheadBeat = newBeat;
@@ -227,21 +238,71 @@ class SongState extends ChangeNotifier {
     if (_audioService == null) return;
     
     // 前回のビートから現在のビートまでの範囲でノートをチェック
-    final previousBeat = beat - 0.05; // 50ms前の位置
+    final startBeat = _lastPlayBeat;
+    final endBeat = beat;
     
+    // 全トラックのノートを一度に取得して効率化
+    final allNotes = <Note>[];
     for (final track in _tracks.values) {
-      for (final note in track.notes) {
-        // ノートの開始位置が現在のビート範囲内にある場合に再生
-        if (note.startBeat >= previousBeat && note.startBeat < beat) {
+      allNotes.addAll(track.notes);
+    }
+    
+    // 範囲内のノートをフィルタリング
+    for (final note in allNotes) {
+      final noteStartBeat = note.startBeat;
+      final noteEndBeat = note.startBeat + note.duration;
+      
+      // ノートの開始位置が範囲内にある場合に再生
+      if (noteStartBeat >= startBeat && noteStartBeat < endBeat) {
+        if (!_activeNoteIds.contains(note.id)) {
           _audioService!.playNote(note);
+          _activeNoteIds.add(note.id);
         }
-        // ノートの終了位置が現在のビート範囲内にある場合に停止
-        final noteEndBeat = note.startBeat + note.duration;
-        if (noteEndBeat >= previousBeat && noteEndBeat < beat) {
+      }
+      
+      // ノートの終了位置が範囲内にある場合に停止
+      if (noteEndBeat >= startBeat && noteEndBeat < endBeat) {
+        if (_activeNoteIds.contains(note.id)) {
           _audioService!.stopNote(note);
+          _activeNoteIds.remove(note.id);
         }
       }
     }
+    
+    // 範囲外のノートを停止（スクラブ時など）
+    final notesToStop = <String>[];
+    for (final noteId in _activeNoteIds) {
+      final note = _findNoteById(noteId);
+      if (note == null) {
+        notesToStop.add(noteId);
+        continue;
+      }
+      final noteEndBeat = note.startBeat + note.duration;
+      // ノートが既に終了している場合
+      if (noteEndBeat < beat) {
+        notesToStop.add(noteId);
+      }
+    }
+    for (final noteId in notesToStop) {
+      final note = _findNoteById(noteId);
+      if (note != null) {
+        _audioService!.stopNote(note);
+      }
+      _activeNoteIds.remove(noteId);
+    }
+    
+    _lastPlayBeat = beat;
+  }
+
+  Note? _findNoteById(String noteId) {
+    for (final track in _tracks.values) {
+      for (final note in track.notes) {
+        if (note.id == noteId) {
+          return note;
+        }
+      }
+    }
+    return null;
   }
 
   void stop() {
@@ -249,6 +310,19 @@ class SongState extends ChangeNotifier {
     _isPlaying = false;
     _playTimer?.cancel();
     _playTimer = null;
+    
+    // 再生中のノートをすべて停止
+    if (_audioService != null) {
+      for (final noteId in _activeNoteIds) {
+        final note = _findNoteById(noteId);
+        if (note != null) {
+          _audioService!.stopNote(note);
+        }
+      }
+    }
+    _activeNoteIds.clear();
+    _lastPlayBeat = 0.0;
+    
     notifyListeners();
   }
 

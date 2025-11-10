@@ -595,18 +595,7 @@ class _InteractivePianoRollState extends State<_InteractivePianoRoll> {
   double _scrollOffset = 0.0;
 
   @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  void _onScroll() {
-    // スクロール中は何もしない
-  }
-
-  @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
