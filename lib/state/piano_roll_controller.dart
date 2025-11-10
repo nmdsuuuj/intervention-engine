@@ -3,6 +3,9 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 
 import '../models/note.dart';
+import '../models/snap_mode.dart';
+
+enum EditorTool { select, draw }
 
 /// ピアノロール画面における選択状態とプレビュー表示を管理するコントローラ。
 class PianoRollController extends ChangeNotifier {
@@ -24,6 +27,8 @@ class PianoRollController extends ChangeNotifier {
   }
 
   String _contextType;
+  EditorTool _editorTool = EditorTool.select;
+  SnapMode _snapMode = SnapMode.beat;
   final List<Note> _selectedNotes = [];
   List<Note>? _previewNotes;
 
@@ -41,6 +46,23 @@ class PianoRollController extends ChangeNotifier {
 
   List<Note>? get previewNotes =>
       _previewNotes == null ? null : List.unmodifiable(_previewNotes!);
+
+  EditorTool get editorTool => _editorTool;
+  set editorTool(EditorTool value) {
+    if (value == _editorTool) return;
+    _editorTool = value;
+    notifyListeners();
+  }
+
+  bool get isSelectToolActive => _editorTool == EditorTool.select;
+  bool get isDrawToolActive => _editorTool == EditorTool.draw;
+
+  SnapMode get snapMode => _snapMode;
+  set snapMode(SnapMode value) {
+    if (value == _snapMode) return;
+    _snapMode = value;
+    notifyListeners();
+  }
 
   void updateSelection(List<Note> notes) {
     _selectedNotes
@@ -64,5 +86,20 @@ class PianoRollController extends ChangeNotifier {
     if (_previewNotes == null) return;
     _previewNotes = null;
     notifyListeners();
+  }
+
+  double snapBeat(double rawBeat) {
+    switch (_snapMode) {
+      case SnapMode.free:
+        return rawBeat;
+      case SnapMode.bar:
+        const beatsPerBar = 4.0;
+        return (rawBeat / beatsPerBar).roundToDouble() * beatsPerBar;
+      case SnapMode.beat:
+        return rawBeat.roundToDouble();
+      case SnapMode.grid:
+        const gridResolution = 0.25; // 16分音符基準
+        return (rawBeat / gridResolution).roundToDouble() * gridResolution;
+    }
   }
 }

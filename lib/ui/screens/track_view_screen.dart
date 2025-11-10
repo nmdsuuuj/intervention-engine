@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/mutate_workflow_controller.dart';
+import '../../models/snap_mode.dart';
 import '../../state/piano_roll_controller.dart';
 import '../../state/song_state.dart';
 import '../../state/undo_manager.dart';
@@ -29,7 +30,11 @@ class TrackViewScreen extends StatelessWidget {
           children: [
             SizedBox(
               width: constraints.maxWidth * 0.15,
-              child: _LeftThumbColumn(controller: mutateController),
+                child: _LeftThumbColumn(
+                  controller: mutateController,
+                  pianoRollController: pianoRollController,
+                  songState: songState,
+                ),
             ),
             Expanded(
               flex: 7,
@@ -53,32 +58,109 @@ class TrackViewScreen extends StatelessWidget {
 class _LeftThumbColumn extends StatelessWidget {
   const _LeftThumbColumn({
     required this.controller,
+    required this.pianoRollController,
+    required this.songState,
   });
 
   final MutateWorkflowController controller;
+  final PianoRollController pianoRollController;
+  final SongState songState;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Theme.of(context).colorScheme.surfaceVariant,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _ThumbButton(label: '← 戻る', icon: Icons.arrow_back, onPressed: () {}),
-            _ThumbButton(label: '選択', icon: Icons.select_all, onPressed: () {}),
-            _ThumbButton(label: '書き込み', icon: Icons.brush, onPressed: () {}),
-            _ThumbButton(label: 'スナップ', icon: Icons.grid_on, onPressed: () {}),
-            _ThumbButton(label: 'オクターブ ↑', icon: Icons.arrow_upward, onPressed: () {}),
-            _ThumbButton(label: 'オクターブ ↓', icon: Icons.arrow_downward, onPressed: () {}),
-            const Spacer(),
-            MutateButton(controller: controller),
-            const SizedBox(height: 12),
-            _ThumbButton(label: '鼻歌 (Hum)', icon: Icons.mic, onPressed: () {}),
-          ],
-        ),
-      ),
+    final listenable =
+        Listenable.merge([controller, pianoRollController, songState]);
+    return AnimatedBuilder(
+      animation: listenable,
+      builder: (context, _) {
+        final canCopy = controller.canCopy;
+        final canPaste = controller.canPaste;
+        final canDelete = controller.canDelete;
+        return ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ThumbButton(
+                  label: '← 戻る',
+                  icon: Icons.arrow_back,
+                  onPressed: () {},
+                ),
+                const SizedBox(height: 8),
+                _ThumbButton(
+                  label: '選択',
+                  icon: Icons.select_all,
+                  isActive: pianoRollController.isSelectToolActive,
+                  onPressed: () =>
+                      pianoRollController.editorTool = EditorTool.select,
+                ),
+                const SizedBox(height: 8),
+                _ThumbButton(
+                  label: '書き込み',
+                  icon: Icons.brush,
+                  isActive: pianoRollController.isDrawToolActive,
+                  onPressed: () =>
+                      pianoRollController.editorTool = EditorTool.draw,
+                ),
+                const SizedBox(height: 12),
+                _SnapSelector(pianoRollController: pianoRollController),
+                const SizedBox(height: 12),
+                _ThumbButton(
+                  label: 'オクターブ ↑',
+                  icon: Icons.arrow_upward,
+                  onPressed: () {},
+                ),
+                const SizedBox(height: 8),
+                _ThumbButton(
+                  label: 'オクターブ ↓',
+                  icon: Icons.arrow_downward,
+                  onPressed: () {},
+                ),
+                if (canCopy || canPaste || canDelete) ...[
+                  const SizedBox(height: 16),
+                  if (canCopy)
+                    _ThumbButton(
+                      label: 'コピー',
+                      icon: Icons.copy,
+                      onPressed: controller.copySelection,
+                    ),
+                  if (canCopy) const SizedBox(height: 8),
+                  if (canCopy)
+                    _ThumbButton(
+                      label: 'カット',
+                      icon: Icons.content_cut,
+                      onPressed: controller.cutSelection,
+                    ),
+                  if (canDelete) const SizedBox(height: 8),
+                  if (canDelete)
+                    _ThumbButton(
+                      label: '削除',
+                      icon: Icons.delete,
+                      onPressed: controller.deleteSelection,
+                    ),
+                  if (canPaste) const SizedBox(height: 8),
+                  if (canPaste)
+                    _ThumbButton(
+                      label: 'ペースト',
+                      icon: Icons.paste,
+                      onPressed: controller.pasteClipboard,
+                    ),
+                ],
+                const Spacer(),
+                MutateButton(controller: controller),
+                const SizedBox(height: 12),
+                _ThumbButton(
+                  label: '鼻歌 (Hum)',
+                  icon: Icons.mic,
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -141,30 +223,150 @@ class _ThumbButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.isPrimary = false,
+    this.isActive = false,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
   final bool isPrimary;
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+    final Color backgroundColor;
+    final Color foregroundColor;
+    if (!enabled) {
+      backgroundColor = scheme.surfaceVariant;
+      foregroundColor = scheme.onSurface.withOpacity(0.4);
+    } else if (isPrimary) {
+      backgroundColor = scheme.primary;
+      foregroundColor = scheme.onPrimary;
+    } else if (isActive) {
+      backgroundColor = scheme.primaryContainer;
+      foregroundColor = scheme.onPrimaryContainer;
+    } else {
+      backgroundColor = scheme.surface;
+      foregroundColor = scheme.onSurface;
+    }
+
     final button = ElevatedButton.icon(
       icon: Icon(icon),
       onPressed: onPressed,
       label: Text(label),
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
-        backgroundColor: isPrimary
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
-        foregroundColor: isPrimary ? Colors.white : Theme.of(context).colorScheme.onSurface,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        disabledBackgroundColor: scheme.surfaceVariant,
+        disabledForegroundColor: scheme.onSurface.withOpacity(0.4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: button,
+    );
+  }
+}
+
+class _SnapSelector extends StatelessWidget {
+  const _SnapSelector({
+    required this.pianoRollController,
+  });
+
+  final PianoRollController pianoRollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.grid_on),
+        label: Text('スナップ: ${pianoRollController.snapMode.label}'),
+        onPressed: () => _showSnapSheet(context),
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSnapSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final mode in SnapMode.values)
+                ListTile(
+                  title: Text(mode.label),
+                  trailing: mode == pianoRollController.snapMode
+                      ? const Icon(Icons.check)
+                      : null,
+                  onTap: () {
+                    pianoRollController.snapMode = mode;
+                    Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PlayheadControl extends StatelessWidget {
+  const _PlayheadControl({
+    required this.songState,
+    required this.pianoRollController,
+  });
+
+  final SongState songState;
+  final PianoRollController pianoRollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: songState,
+      builder: (context, _) {
+        final clamped = songState.playheadBeat.clamp(0.0, 16.0);
+        final sliderValue = (clamped as num).toDouble();
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '再生ヘッド: ${songState.playheadBeat.toStringAsFixed(2)} 拍',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              Slider(
+                value: sliderValue,
+                min: 0,
+                max: 16,
+                divisions: 64,
+                label: sliderValue.toStringAsFixed(2),
+                onChanged: (value) {
+                  final snapped = pianoRollController.snapMode == SnapMode.free
+                      ? value
+                      : pianoRollController.snapBeat(value);
+                  songState.playheadBeat = snapped;
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -189,6 +391,10 @@ class _PianoRollArea extends StatelessWidget {
           songState: songState,
           pianoRollController: pianoRollController,
           mutateController: mutateController,
+        ),
+        _PlayheadControl(
+          songState: songState,
+          pianoRollController: pianoRollController,
         ),
         Expanded(
           child: _PianoRollMock(
@@ -299,44 +505,61 @@ class _PianoRollMock extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           itemCount: notes.length,
           itemBuilder: (context, index) {
-            final note = notes[index];
-            final isSelected = selectedIds.contains(note.id);
-            final isPreview = previewIds.contains(note.id);
-            return GestureDetector(
-              onTap: () {
-                final current = pianoRollController.selectedNotes.toList();
-                if (isSelected) {
-                  current.removeWhere((n) => n.id == note.id);
-                } else {
-                  current.add(note);
-                }
-                pianoRollController.updateSelection(current);
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isPreview
-                      ? Colors.orange.withOpacity(0.4)
-                      : isSelected
-                          ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
-                          : Theme.of(context).colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.transparent,
+              final note = notes[index];
+              final isSelected = selectedIds.contains(note.id);
+              final isPreview = previewIds.contains(note.id);
+              final playhead = songState.playheadBeat;
+              final isPlayheadActive =
+                  playhead >= note.startBeat &&
+                  playhead < note.startBeat + note.duration;
+              final Color backgroundColor;
+              if (isPreview) {
+                backgroundColor = Colors.orange.withOpacity(0.4);
+              } else if (isSelected) {
+                backgroundColor =
+                    Theme.of(context).colorScheme.primary.withOpacity(0.2);
+              } else if (isPlayheadActive) {
+                backgroundColor =
+                    Theme.of(context).colorScheme.secondaryContainer;
+              } else {
+                backgroundColor =
+                    Theme.of(context).colorScheme.surfaceVariant;
+              }
+              return GestureDetector(
+                onTap: () {
+                  final current = pianoRollController.selectedNotes.toList();
+                  if (isSelected) {
+                    current.removeWhere((n) => n.id == note.id);
+                  } else {
+                    current.add(note);
+                  }
+                  pianoRollController.updateSelection(current);
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : isPlayheadActive
+                              ? Theme.of(context).colorScheme.secondary
+                              : Colors.transparent,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Note ${note.id} | Pitch ${note.pitch}'),
+                      Text(
+                        'Start ${note.startBeat.toStringAsFixed(2)} / Len ${note.duration.toStringAsFixed(2)}',
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Note ${note.id} | Pitch ${note.pitch}'),
-                    Text('Start ${note.startBeat.toStringAsFixed(2)}'),
-                  ],
-                ),
-              ),
-            );
+              );
           },
         );
       },

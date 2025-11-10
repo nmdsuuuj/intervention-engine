@@ -45,6 +45,18 @@ class MutateWorkflowController extends ChangeNotifier {
 
   bool get isBusy => _isBusy;
 
+  bool get canCopy =>
+      pianoRollController.isSelectToolActive &&
+      pianoRollController.hasSelection &&
+      !_isBusy;
+
+  bool get canPaste =>
+      pianoRollController.isSelectToolActive &&
+      songState.hasClipboard &&
+      !_isBusy;
+
+  bool get canDelete => canCopy;
+
   void _handleSelectionChanged() {
     notifyListeners();
   }
@@ -161,6 +173,91 @@ class MutateWorkflowController extends ChangeNotifier {
     _originalSnapshot = null;
     _activeTechnique = null;
     notifyListeners();
+  }
+
+  void copySelection() {
+    if (!canCopy) return;
+    final selection = pianoRollController.selectedNotes
+        .map((note) => note.copyWith())
+        .toList(growable: false);
+    songState.copyToClipboard(selection);
+  }
+
+  void cutSelection() {
+    if (!canCopy) return;
+    final trackId = pianoRollController.trackId;
+    final selection = pianoRollController.selectedNotes
+        .map((note) => note.copyWith())
+        .toList(growable: false);
+    final removed = songState.cutNotes(trackId, selection);
+    if (removed.isEmpty) return;
+    final removedForUndo =
+        removed.map((note) => note.copyWith()).toList(growable: false);
+    pianoRollController.clearSelection();
+    undoManager.push(
+      UndoEntry(
+        description: '[Cut] ${removed.length} notes',
+        undo: () {
+          songState.addNotes(trackId, removedForUndo);
+          pianoRollController.updateSelection(removedForUndo);
+        },
+        redo: () {
+          songState.removeNotes(trackId, removedForUndo);
+          pianoRollController.clearSelection();
+        },
+      ),
+    );
+  }
+
+  void deleteSelection() {
+    if (!canDelete) return;
+    final trackId = pianoRollController.trackId;
+    final selection = pianoRollController.selectedNotes
+        .map((note) => note.copyWith())
+        .toList(growable: false);
+    final removed = songState.removeNotes(trackId, selection);
+    if (removed.isEmpty) return;
+    final removedForUndo =
+        removed.map((note) => note.copyWith()).toList(growable: false);
+    pianoRollController.clearSelection();
+    undoManager.push(
+      UndoEntry(
+        description: '[Delete] ${removed.length} notes',
+        undo: () {
+          songState.addNotes(trackId, removedForUndo);
+          pianoRollController.updateSelection(removedForUndo);
+        },
+        redo: () {
+          songState.removeNotes(trackId, removedForUndo);
+          pianoRollController.clearSelection();
+        },
+      ),
+    );
+  }
+
+  void pasteClipboard() {
+    if (!canPaste) return;
+    final trackId = pianoRollController.trackId;
+    final targetBeat =
+        pianoRollController.snapBeat(songState.playheadBeat);
+    final pasted = songState.pasteClipboard(trackId, targetBeat);
+    if (pasted.isEmpty) return;
+    final pastedForUndo =
+        pasted.map((note) => note.copyWith()).toList(growable: false);
+    pianoRollController.updateSelection(pasted);
+    undoManager.push(
+      UndoEntry(
+        description: '[Paste] ${pasted.length} notes',
+        undo: () {
+          songState.removeNotes(trackId, pastedForUndo);
+          pianoRollController.clearSelection();
+        },
+        redo: () {
+          songState.addNotes(trackId, pastedForUndo);
+          pianoRollController.updateSelection(pastedForUndo);
+        },
+      ),
+    );
   }
 
   void _setBusy(bool value) {
