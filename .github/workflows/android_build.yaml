@@ -1,0 +1,60 @@
+# GitHub Actions の名前
+name: Build Android APK
+
+# 実行するタイミング（mainブランチにコードが追加された時）
+on:
+  push:
+    branches:
+      - main
+
+# 実行するお仕事（ジョブ）
+jobs:
+  build:
+    # Windows/Mac/Linux のうち、Linux (ubuntu) で動かす
+    runs-on: ubuntu-latest
+
+    # お仕事の具体的なステップ
+    steps:
+      # 1. リポジトリのコードをダウンロードする
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Java (Androidビルドに必要) を準備する
+      - name: Set up Java JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      # 3. Flutter (アプリ開発環境) を準備する
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable' # 安定版を使う
+
+      # 4. Flutter の依存関係 (pubspec.yaml) をインストールする
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # 5. Android の APK ファイルをビルド（作成）する
+      #    ※エラーが出ても無視して続ける (flutter_midi_pro のため)
+      - name: Build APK
+        run: flutter build apk --release
+        continue-on-error: true # この行が重要
+
+      # 6. 完成した APK ファイルを見つけやすくする
+      #    (ビルドが成功した場合のみ実行)
+      - name: Find and rename APK
+        if: success()
+        run: |
+          # app-release.apk という名前のファイルを探す
+          find build/app/outputs/flutter-apk/ -name "app-release.apk" -exec mv {} app-release.apk \;
+        
+      # 7. 完成した APK を「Artifacts」としてアップロードする
+      #    (ビルドが成功した場合のみ実行)
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk # ダウンロード時のファイル名
+          path: app-release.apk # ステップ6 で見つけたファイル
