@@ -24,7 +24,9 @@ class SongState extends ChangeNotifier {
   double _bpm;
   double _playheadBeat = 0;
   bool _isPlaying = false;
+  bool _metronomeEnabled = false;
   Timer? _playTimer;
+  Timer? _metronomeTimer;
 
   List<Note> notesForTrack(String trackId) {
     final track = _tracks[trackId];
@@ -149,6 +151,36 @@ class SongState extends ChangeNotifier {
 
   bool get isPlaying => _isPlaying;
 
+  bool get metronomeEnabled => _metronomeEnabled;
+
+  void toggleMetronome() {
+    _metronomeEnabled = !_metronomeEnabled;
+    if (_metronomeEnabled) {
+      _startMetronome();
+    } else {
+      _stopMetronome();
+    }
+    notifyListeners();
+  }
+
+  void _startMetronome() {
+    _metronomeTimer?.cancel();
+    final beatInterval = Duration(milliseconds: (60000 / _bpm).round());
+    _metronomeTimer = Timer.periodic(beatInterval, (timer) {
+      if (!_metronomeEnabled) {
+        timer.cancel();
+        return;
+      }
+      // メトロノームの音を鳴らす（実際の音声再生は後で実装）
+      notifyListeners();
+    });
+  }
+
+  void _stopMetronome() {
+    _metronomeTimer?.cancel();
+    _metronomeTimer = null;
+  }
+
   void togglePlay() {
     if (_isPlaying) {
       stop();
@@ -192,6 +224,7 @@ class SongState extends ChangeNotifier {
   @override
   void dispose() {
     stop();
+    _stopMetronome();
     super.dispose();
   }
 

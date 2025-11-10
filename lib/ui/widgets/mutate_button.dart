@@ -19,7 +19,7 @@ class MutateButton extends StatelessWidget {
       builder: (context, _) {
         final enabled = controller.isMutateEnabled;
         return SizedBox(
-          height: 72,
+          height: 48,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: enabled
@@ -27,11 +27,15 @@ class MutateButton extends StatelessWidget {
                   : Theme.of(context).disabledColor,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(8),
               ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
             ),
             onPressed: enabled ? () => _handlePressed(context) : null,
-            child: const Text('[ MUTATE ]'),
+            child: const Text(
+              '[ MUTATE ]',
+              style: TextStyle(fontSize: 12),
+            ),
           ),
         );
       },

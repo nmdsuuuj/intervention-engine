@@ -32,11 +32,17 @@ class TrackViewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 568dp × 320dp を基準にレイアウト最適化
+        final screenWidth = constraints.maxWidth;
+        final screenHeight = constraints.maxHeight;
+        final sideBarWidth = math.min(screenWidth * 0.15, 80.0); // サイドバー幅を縮小
+        final centerWidth = screenWidth - (sideBarWidth * 2);
+        
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: math.min(constraints.maxWidth * 0.12, 120),
+              width: sideBarWidth,
               child: _LeftThumbColumn(
                 controller: mutateController,
                 pianoRollController: pianoRollController,
@@ -44,7 +50,6 @@ class TrackViewScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              flex: 7,
               child: _PianoRollArea(
                 songState: songState,
                 pianoRollController: pianoRollController,
@@ -52,7 +57,7 @@ class TrackViewScreen extends StatelessWidget {
               ),
             ),
             SizedBox(
-              width: math.min(constraints.maxWidth * 0.12, 120),
+              width: sideBarWidth,
               child: _RightThumbColumn(
                 undoManager: undoManager,
                 songState: songState,
@@ -90,7 +95,7 @@ class _LeftThumbColumn extends StatelessWidget {
           color: Theme.of(context).colorScheme.surfaceVariant,
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -99,7 +104,7 @@ class _LeftThumbColumn extends StatelessWidget {
                     icon: Icons.arrow_back,
                     onPressed: () {},
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   _ThumbButton(
                     label: 'SEL',
                     icon: Icons.select_all,
@@ -107,7 +112,7 @@ class _LeftThumbColumn extends StatelessWidget {
                     onPressed: () =>
                         pianoRollController.editorTool = EditorTool.select,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   _ThumbButton(
                     label: 'DRAW',
                     icon: Icons.brush,
@@ -115,9 +120,9 @@ class _LeftThumbColumn extends StatelessWidget {
                     onPressed: () =>
                         pianoRollController.editorTool = EditorTool.draw,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _SnapSelector(pianoRollController: pianoRollController),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _ThumbButton(
                     label: 'OCT+',
                     icon: Icons.arrow_upward,
@@ -125,7 +130,7 @@ class _LeftThumbColumn extends StatelessWidget {
                       pianoRollController.octaveOffset += 12;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   _ThumbButton(
                     label: 'OCT-',
                     icon: Icons.arrow_downward,
@@ -134,28 +139,28 @@ class _LeftThumbColumn extends StatelessWidget {
                     },
                   ),
                   if (canCopy || canPaste || canDelete) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     if (canCopy)
                       _ThumbButton(
                         label: 'CPY',
                         icon: Icons.copy,
                         onPressed: controller.copySelection,
                       ),
-                    if (canCopy) const SizedBox(height: 8),
+                    if (canCopy) const SizedBox(height: 4),
                     if (canCopy)
                       _ThumbButton(
                         label: 'CUT',
                         icon: Icons.content_cut,
                         onPressed: controller.cutSelection,
                       ),
-                    if (canDelete) const SizedBox(height: 8),
+                    if (canDelete) const SizedBox(height: 4),
                     if (canDelete)
                       _ThumbButton(
                         label: 'DEL',
                         icon: Icons.delete,
                         onPressed: controller.deleteSelection,
                       ),
-                    if (canPaste) const SizedBox(height: 8),
+                    if (canPaste) const SizedBox(height: 4),
                     if (canPaste)
                       _ThumbButton(
                         label: 'PST',
@@ -163,9 +168,9 @@ class _LeftThumbColumn extends StatelessWidget {
                         onPressed: controller.pasteClipboard,
                       ),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   MutateButton(controller: controller),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _ThumbButton(
                     label: 'HUM',
                     icon: Icons.mic,
@@ -196,13 +201,23 @@ class _RightThumbColumn extends StatelessWidget {
       color: Theme.of(context).colorScheme.surfaceVariant,
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _ThumbButton(label: 'GUIDE', icon: Icons.visibility, onPressed: () {}),
+              const SizedBox(height: 4),
               _ThumbButton(label: 'SAVE', icon: Icons.save, onPressed: () {}),
-              _ThumbButton(label: 'METRO', icon: Icons.timer, onPressed: () {}),
+              const SizedBox(height: 4),
+              _ThumbButton(
+                label: songState.metronomeEnabled ? 'METRO ON' : 'METRO',
+                icon: Icons.timer,
+                isActive: songState.metronomeEnabled,
+                onPressed: () {
+                  songState.toggleMetronome();
+                },
+              ),
+              const SizedBox(height: 8),
               AnimatedBuilder(
                 animation: undoManager,
                 builder: (context, _) {
@@ -213,6 +228,7 @@ class _RightThumbColumn extends StatelessWidget {
                         icon: Icons.redo,
                         onPressed: undoManager.canRedo ? undoManager.redo : null,
                       ),
+                      const SizedBox(height: 4),
                       _ThumbButton(
                         label: 'UNDO',
                         icon: Icons.undo,
@@ -222,7 +238,7 @@ class _RightThumbColumn extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               _ThumbButton(
                 label: songState.isPlaying ? 'STOP' : 'PLAY',
                 icon: songState.isPlaying ? Icons.stop : Icons.play_arrow,
@@ -275,22 +291,26 @@ class _ThumbButton extends StatelessWidget {
     }
 
     final button = ElevatedButton.icon(
-      icon: Icon(icon),
+      icon: Icon(icon, size: 16),
       onPressed: onPressed,
-      label: Text(label),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 11),
+      ),
       style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
         disabledBackgroundColor: scheme.surfaceVariant,
         disabledForegroundColor: scheme.onSurface.withOpacity(0.4),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
         ),
+        minimumSize: const Size(0, 36),
       ),
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: button,
     );
   }
@@ -306,14 +326,18 @@ class _SnapSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 48,
+      height: 36,
       child: OutlinedButton.icon(
-        icon: const Icon(Icons.grid_on),
-        label: Text('SNAP: ${pianoRollController.snapMode.shortLabel}'),
+        icon: const Icon(Icons.grid_on, size: 16),
+        label: Text(
+          'SNAP: ${pianoRollController.snapMode.shortLabel}',
+          style: const TextStyle(fontSize: 11),
+        ),
         onPressed: () => _showSnapSheet(context),
         style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
       ),
@@ -364,13 +388,13 @@ class _PlayheadControl extends StatelessWidget {
         final clamped = songState.playheadBeat.clamp(0.0, 16.0);
         final sliderValue = (clamped as num).toDouble();
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'PH: ${songState.playheadBeat.toStringAsFixed(2)}',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               Slider(
                 value: sliderValue,
@@ -463,7 +487,7 @@ class _TrackHeader extends StatelessWidget {
     return ColoredBox(
       color: Theme.of(context).colorScheme.surface,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -471,15 +495,17 @@ class _TrackHeader extends StatelessWidget {
               isSelected: tracks
                   .map((track) => track.id == selectedTrackId)
                   .toList(growable: false),
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 32),
               children: tracks
                   .map(
                     (track) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Text(
                         (track.name.length >= 2
                                 ? track.name.substring(0, 2)
                                 : track.name)
                             .toUpperCase(),
+                        style: const TextStyle(fontSize: 11),
                       ),
                     ),
                   )
@@ -504,6 +530,7 @@ class _TrackHeader extends StatelessWidget {
                   currentTrack == null
                       ? 'TRK: ${pianoRollController.trackId}'
                       : 'TRK: ${currentTrack.name} | CTX: ${currentTrack.contextType}',
+                  style: const TextStyle(fontSize: 10),
                 );
               },
             ),
@@ -569,30 +596,62 @@ class _InteractivePianoRollState extends State<_InteractivePianoRoll> {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, _) {
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: _handleTapDown,
-          onPanStart: _handlePanStart,
-          onPanUpdate: _handlePanUpdate,
-          onPanEnd: _handlePanEnd,
-          onHorizontalDragUpdate: _handleHorizontalDrag,
-          child: NotificationListener<ScrollEndNotification>(
-            onNotification: (notification) {
-              _snapToBar();
-              return true;
-            },
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              scrollDirection: Axis.horizontal,
-              physics: const ClampingScrollPhysics(),
-              child: CustomPaint(
-              painter: PianoRollPainter(
-                songState: widget.songState,
-                pianoRollController: widget.pianoRollController,
-                timelineBeats: widget.timelineBeats,
-                timelineWidth: widget.timelineWidth,
-              ),
-                size: Size(widget.timelineWidth, widget.viewHeight),
+        return Listener(
+          onPointerDown: (event) {
+            // タップイベントを処理
+            final local = event.localPosition;
+            final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+            final adjustedX = local.dx + scrollOffset;
+            final beat = _pixelToBeat(adjustedX);
+            final pitch = _pixelToPitch(local.dy) + widget.pianoRollController.octaveOffset;
+
+            if (widget.pianoRollController.isDrawToolActive &&
+                !widget.mutateController.isBusy) {
+              // 書き込みモード: ノートを作成（オクターブオフセットを適用）
+              final clampedPitch = pitch.clamp(0, 127);
+              widget.mutateController.createNoteAt(beat, clampedPitch);
+            } else if (widget.pianoRollController.isSelectToolActive) {
+              // 選択モード: タップした位置のノートを選択/解除
+              final notes = widget.songState.notesForTrack(
+                widget.pianoRollController.trackId,
+              );
+              final tappedNote = _findNoteAtPosition(notes, beat, pitch);
+              if (tappedNote != null) {
+                final current = widget.pianoRollController.selectedNotes.toList();
+                if (current.any((n) => n.id == tappedNote.id)) {
+                  current.removeWhere((n) => n.id == tappedNote.id);
+                } else {
+                  current.add(tappedNote);
+                }
+                widget.pianoRollController.updateSelection(current);
+              } else {
+                widget.pianoRollController.clearSelection();
+              }
+            }
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onPanStart: _handlePanStart,
+            onPanUpdate: _handlePanUpdate,
+            onPanEnd: _handlePanEnd,
+            child: NotificationListener<ScrollEndNotification>(
+              onNotification: (notification) {
+                _snapToBar();
+                return true;
+              },
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: CustomPaint(
+                  painter: PianoRollPainter(
+                    songState: widget.songState,
+                    pianoRollController: widget.pianoRollController,
+                    timelineBeats: widget.timelineBeats,
+                    timelineWidth: widget.timelineWidth,
+                  ),
+                  size: Size(widget.timelineWidth, widget.viewHeight),
+                ),
               ),
             ),
           ),
@@ -601,9 +660,6 @@ class _InteractivePianoRollState extends State<_InteractivePianoRoll> {
     );
   }
 
-  void _handleHorizontalDrag(DragUpdateDetails details) {
-    // 横スクロールはSingleChildScrollViewが処理
-  }
 
   void _snapToBar() {
     // スクロール終了時に小節単位でスナップ
@@ -619,38 +675,6 @@ class _InteractivePianoRollState extends State<_InteractivePianoRoll> {
     );
   }
 
-  void _handleTapDown(TapDownDetails details) {
-    final local = details.localPosition;
-    // スクロールオフセットを考慮
-    final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-    final adjustedX = local.dx + scrollOffset;
-    final beat = _pixelToBeat(adjustedX);
-    final pitch = _pixelToPitch(local.dy) + widget.pianoRollController.octaveOffset;
-
-    if (widget.pianoRollController.isDrawToolActive &&
-        !widget.mutateController.isBusy) {
-      // 書き込みモード: ノートを作成（オクターブオフセットを適用）
-      final clampedPitch = pitch.clamp(0, 127);
-      widget.mutateController.createNoteAt(beat, clampedPitch);
-    } else if (widget.pianoRollController.isSelectToolActive) {
-      // 選択モード: タップした位置のノートを選択/解除
-      final notes = widget.songState.notesForTrack(
-        widget.pianoRollController.trackId,
-      );
-      final tappedNote = _findNoteAtPosition(notes, beat, pitch);
-      if (tappedNote != null) {
-        final current = widget.pianoRollController.selectedNotes.toList();
-        if (current.any((n) => n.id == tappedNote.id)) {
-          current.removeWhere((n) => n.id == tappedNote.id);
-        } else {
-          current.add(tappedNote);
-        }
-        widget.pianoRollController.updateSelection(current);
-      } else {
-        widget.pianoRollController.clearSelection();
-      }
-    }
-  }
 
   void _handlePanStart(DragStartDetails details) {
     if (!widget.pianoRollController.isDrawToolActive) return;
