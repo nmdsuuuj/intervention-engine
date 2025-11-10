@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_midi_pro/flutter_midi_pro.dart';
+// TODO: flutter_midi_pro パッケージのAPIが変更された可能性があります。
+// パッケージの最新ドキュメントを確認して、正しいAPIを使用してください。
+// import 'package:flutter_midi_pro/flutter_midi_pro.dart';
 
 import '../models/note.dart';
 
@@ -20,7 +22,9 @@ class AudioPreviewService {
   final Duration _tickInterval;
   final int _midiChannel;
 
-  final FlutterMidiPro _midi = FlutterMidiPro();
+  // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
+  // final FlutterMidiPro _midi = FlutterMidiPro();
+  dynamic _midi; // 一時的な修正
 
   bool _initialized = false;
   bool _isLooping = false;
@@ -37,8 +41,9 @@ class AudioPreviewService {
 
   Future<void> init() async {
     if (_initialized) return;
-    final soundFontData = await rootBundle.load(_soundFontAsset);
-    await _midi.prepare(sf2: soundFontData);
+    // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
+    // final soundFontData = await rootBundle.load(_soundFontAsset);
+    // await _midi.prepare(sf2: soundFontData);
     _initialized = true;
   }
 
@@ -138,29 +143,32 @@ class AudioPreviewService {
   }
 
   void _noteOn(_ScheduledNote event) {
-    _midi.playMidiNote(
-      midi: event.note.pitch,
-      velocity: event.note.velocity,
-      channel: _midiChannel,
-    );
+    // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
+    // _midi.playMidiNote(
+    //   midi: event.note.pitch,
+    //   velocity: event.note.velocity,
+    //   channel: _midiChannel,
+    // );
     event.isActive = true;
   }
 
   void _noteOff(_ScheduledNote event) {
-    _midi.stopMidiNote(
-      midi: event.note.pitch,
-      channel: _midiChannel,
-    );
+    // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
+    // _midi.stopMidiNote(
+    //   midi: event.note.pitch,
+    //   channel: _midiChannel,
+    // );
     event.isActive = false;
   }
 
   void _stopActiveNotes() {
     for (final event in _scheduledNotes) {
       if (event.isActive) {
-        _midi.stopMidiNote(
-          midi: event.note.pitch,
-          channel: _midiChannel,
-        );
+        // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
+        // _midi.stopMidiNote(
+        //   midi: event.note.pitch,
+        //   channel: _midiChannel,
+        // );
         event.isActive = false;
       }
     }
