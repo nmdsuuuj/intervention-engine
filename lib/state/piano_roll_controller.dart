@@ -29,6 +29,7 @@ class PianoRollController extends ChangeNotifier {
   String _contextType;
   EditorTool _editorTool = EditorTool.select;
   SnapMode _snapMode = SnapMode.beat;
+  int _octaveOffset = 0;
   final List<Note> _selectedNotes = [];
   List<Note>? _previewNotes;
 
@@ -36,6 +37,13 @@ class PianoRollController extends ChangeNotifier {
   set contextType(String value) {
     if (value == _contextType) return;
     _contextType = value;
+    notifyListeners();
+  }
+
+  int get octaveOffset => _octaveOffset;
+  set octaveOffset(int value) {
+    if (value == _octaveOffset) return;
+    _octaveOffset = value.clamp(-48, 48); // -4オクターブから+4オクターブ
     notifyListeners();
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -22,6 +23,8 @@ class SongState extends ChangeNotifier {
   int _noteIdCounter = 0;
   double _bpm;
   double _playheadBeat = 0;
+  bool _isPlaying = false;
+  Timer? _playTimer;
 
   List<Note> notesForTrack(String trackId) {
     final track = _tracks[trackId];
@@ -142,6 +145,54 @@ class SongState extends ChangeNotifier {
     if ((newValue - _playheadBeat).abs() < 1e-6) return;
     _playheadBeat = newValue;
     notifyListeners();
+  }
+
+  bool get isPlaying => _isPlaying;
+
+  void togglePlay() {
+    if (_isPlaying) {
+      stop();
+    } else {
+      play();
+    }
+  }
+
+  void play() {
+    if (_isPlaying) return;
+    _isPlaying = true;
+    _playTimer?.cancel();
+    final beatsPerSecond = _bpm / 60.0;
+    final updateInterval = const Duration(milliseconds: 50); // 20fps
+    _playTimer = Timer.periodic(updateInterval, (timer) {
+      if (!_isPlaying) {
+        timer.cancel();
+        return;
+      }
+      final deltaBeats = beatsPerSecond * (updateInterval.inMilliseconds / 1000.0);
+      final newBeat = _playheadBeat + deltaBeats;
+      if (newBeat >= 64.0) {
+        _playheadBeat = 0.0;
+        stop();
+      } else {
+        _playheadBeat = newBeat;
+      }
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  void stop() {
+    if (!_isPlaying) return;
+    _isPlaying = false;
+    _playTimer?.cancel();
+    _playTimer = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    stop();
+    super.dispose();
   }
 
   Track? trackById(String trackId) {
