@@ -192,6 +192,31 @@ class AudioPreviewService {
       event.isActive = false;
     }
   }
+
+  /// 単一のノートを再生（再生ヘッド用）
+  void playNote(Note note) {
+    try {
+      _midi.playMidiNote(
+        midi: note.pitch,
+        velocity: note.velocity,
+        channel: _midiChannel,
+      );
+    } catch (e) {
+      print('Warning: Could not play MIDI note: $e');
+    }
+  }
+
+  /// 単一のノートを停止（再生ヘッド用）
+  void stopNote(Note note) {
+    try {
+      _midi.stopMidiNote(
+        midi: note.pitch,
+        channel: _midiChannel,
+      );
+    } catch (e) {
+      print('Warning: Could not stop MIDI note: $e');
+    }
+  }
 }
 
 class _ScheduledNote {

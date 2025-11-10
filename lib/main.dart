@@ -58,6 +58,9 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
       audioPreviewService: _audioPreviewService,
     );
 
+    // 再生サービスをSongStateに設定
+    _songState.setAudioService(_audioPreviewService);
+
     Future.microtask(() => _audioPreviewService.init());
   }
 

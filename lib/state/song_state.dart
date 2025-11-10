@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/note.dart';
 import '../models/track.dart';
+import '../services/audio_preview_service.dart';
 
 /// 曲全体のノート状態を保持し、Undo/Redoに対応できるようにする。
 class SongState extends ChangeNotifier {
@@ -28,6 +29,11 @@ class SongState extends ChangeNotifier {
   bool _metronomeEnabled = false;
   Timer? _playTimer;
   Timer? _metronomeTimer;
+  AudioPreviewService? _audioService;
+
+  void setAudioService(AudioPreviewService? service) {
+    _audioService = service;
+  }
 
   List<Note> notesForTrack(String trackId) {
     final track = _tracks[trackId];
@@ -208,10 +214,34 @@ class SongState extends ChangeNotifier {
         stop();
       } else {
         _playheadBeat = newBeat;
+        // 再生ヘッド位置のノートを再生
+        _playNotesAtBeat(_playheadBeat);
       }
       notifyListeners();
     });
     notifyListeners();
+  }
+
+  void _playNotesAtBeat(double beat) {
+    // 現在のビート位置にあるノートを再生
+    if (_audioService == null) return;
+    
+    // 前回のビートから現在のビートまでの範囲でノートをチェック
+    final previousBeat = beat - 0.05; // 50ms前の位置
+    
+    for (final track in _tracks.values) {
+      for (final note in track.notes) {
+        // ノートの開始位置が現在のビート範囲内にある場合に再生
+        if (note.startBeat >= previousBeat && note.startBeat < beat) {
+          _audioService!.playNote(note);
+        }
+        // ノートの終了位置が現在のビート範囲内にある場合に停止
+        final noteEndBeat = note.startBeat + note.duration;
+        if (noteEndBeat >= previousBeat && noteEndBeat < beat) {
+          _audioService!.stopNote(note);
+        }
+      }
+    }
   }
 
   void stop() {
