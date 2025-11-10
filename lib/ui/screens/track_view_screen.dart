@@ -411,33 +411,13 @@ class _PianoRollArea extends StatelessWidget {
               final double viewHeight = constraints.maxHeight.isFinite
                   ? constraints.maxHeight
                   : _kNoteRowHeight * 16;
-              return GestureDetector(
-                behavior: HitTestBehavior.deferToChild,
-                onTapDown: (details) {
-                  if (!pianoRollController.isDrawToolActive ||
-                      mutateController.isBusy) {
-                    return;
-                  }
-                  final local = details.localPosition;
-                  final clampedDx = local.dx.clamp(0.0, timelineWidth);
-                  final rawBeat =
-                      (clampedDx / timelineWidth) * timelineBeats;
-                  final rows = math.max(
-                    1,
-                    (viewHeight / _kNoteRowHeight).floor(),
-                  );
-                  final rawRow = (local.dy / _kNoteRowHeight).floor();
-                  final rowClamped = rawRow.clamp(0, rows - 1);
-                  final pitch = (_kTopPitch - rowClamped).clamp(0, 127);
-                  mutateController.createNoteAt(rawBeat, pitch);
-                },
-                child: _PianoRollMock(
-                  songState: songState,
-                  pianoRollController: pianoRollController,
-                  mutateController: mutateController,
-                  timelineBeats: timelineBeats,
-                  timelineWidth: timelineWidth,
-                ),
+              return _InteractivePianoRoll(
+                songState: songState,
+                pianoRollController: pianoRollController,
+                mutateController: mutateController,
+                timelineBeats: timelineBeats,
+                timelineWidth: timelineWidth,
+                viewHeight: viewHeight,
               );
             },
           ),
@@ -519,13 +499,15 @@ class _TrackHeader extends StatelessWidget {
   }
 }
 
-class _PianoRollMock extends StatelessWidget {
-  const _PianoRollMock({
+/// 本物のグラフィカルなピアノロールウィジェット（CustomPaint使用）
+class _InteractivePianoRoll extends StatefulWidget {
+  const _InteractivePianoRoll({
     required this.songState,
     required this.pianoRollController,
     required this.mutateController,
     required this.timelineBeats,
     required this.timelineWidth,
+    required this.viewHeight,
   });
 
   final SongState songState;
@@ -533,122 +515,372 @@ class _PianoRollMock extends StatelessWidget {
   final MutateWorkflowController mutateController;
   final double timelineBeats;
   final double timelineWidth;
+  final double viewHeight;
+
+  @override
+  State<_InteractivePianoRoll> createState() => _InteractivePianoRollState();
+}
+
+class _InteractivePianoRollState extends State<_InteractivePianoRoll> {
+  Note? _resizingNote;
+  double _dragStartDx = 0.0;
 
   @override
   Widget build(BuildContext context) {
-    final animation =
-        Listenable.merge([songState, pianoRollController, mutateController]);
-    final beatPerPixel =
-        timelineWidth == 0 ? 0.0 : timelineBeats / timelineWidth;
+    final animation = Listenable.merge([
+      widget.songState,
+      widget.pianoRollController,
+      widget.mutateController,
+    ]);
     return AnimatedBuilder(
       animation: animation,
       builder: (context, _) {
-        final notes = songState.notesForTrack(pianoRollController.trackId);
-        final selectedIds =
-            pianoRollController.selectedNotes.map((note) => note.id).toSet();
-        final previewIds =
-            pianoRollController.previewNotes?.map((note) => note.id).toSet() ??
-                const <String>{};
-
-          return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            final note = notes[index];
-            final isSelected = selectedIds.contains(note.id);
-            final isPreview = previewIds.contains(note.id);
-            final playhead = songState.playheadBeat;
-            final isPlayheadActive =
-                playhead >= note.startBeat &&
-                playhead < note.startBeat + note.duration;
-            final Color backgroundColor;
-            if (isPreview) {
-              backgroundColor = Colors.orange.withOpacity(0.4);
-            } else if (isSelected) {
-              backgroundColor =
-                  Theme.of(context).colorScheme.primary.withOpacity(0.2);
-            } else if (isPlayheadActive) {
-              backgroundColor =
-                  Theme.of(context).colorScheme.secondaryContainer;
-            } else {
-              backgroundColor =
-                  Theme.of(context).colorScheme.surfaceVariant;
-            }
-            final canSelect = pianoRollController.isSelectToolActive;
-            final canDraw = pianoRollController.isDrawToolActive;
-            final baseNote = note;
-            double dragDx = 0.0;
-            Note liveNote = note;
-            return GestureDetector(
-              onHorizontalDragStart: canDraw
-                  ? (_) {
-                      dragDx = 0.0;
-                      liveNote = baseNote;
-                      mutateController.startNoteResize(baseNote);
-                    }
-                  : null,
-              onHorizontalDragUpdate: canDraw
-                  ? (details) {
-                      dragDx += details.delta.dx;
-                      final deltaBeats = beatPerPixel * dragDx;
-                      final rawEndBeat =
-                          baseNote.startBeat + baseNote.duration + deltaBeats;
-                      final updated =
-                          mutateController.updateNoteResize(liveNote, rawEndBeat);
-                      if (updated != null) {
-                        liveNote = updated;
-                      }
-                    }
-                  : null,
-              onHorizontalDragEnd: canDraw
-                  ? (_) {
-                      mutateController.endNoteResize(liveNote);
-                    }
-                  : null,
-              onTap: canSelect
-                  ? () {
-                      final current = pianoRollController.selectedNotes.toList();
-                      if (isSelected) {
-                        current.removeWhere((n) => n.id == note.id);
-                      } else {
-                        current.add(note);
-                      }
-                      pianoRollController.updateSelection(current);
-                    }
-                  : () {
-                      if (canDraw) {
-                        songState.playheadBeat =
-                            pianoRollController.snapBeat(note.startBeat);
-                      }
-                    },
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : isPlayheadActive
-                            ? Theme.of(context).colorScheme.secondary
-                            : Colors.transparent,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Note ${note.id} | Pitch ${note.pitch}'),
-                    Text(
-                      'Start ${note.startBeat.toStringAsFixed(2)} / Len ${note.duration.toStringAsFixed(2)}',
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: _handleTapDown,
+          onPanStart: _handlePanStart,
+          onPanUpdate: _handlePanUpdate,
+          onPanEnd: _handlePanEnd,
+          child: CustomPaint(
+            painter: PianoRollPainter(
+              songState: widget.songState,
+              pianoRollController: widget.pianoRollController,
+              timelineBeats: widget.timelineBeats,
+              timelineWidth: widget.timelineWidth,
+            ),
+            size: Size(widget.timelineWidth, widget.viewHeight),
+          ),
         );
       },
     );
   }
+
+  void _handleTapDown(TapDownDetails details) {
+    final local = details.localPosition;
+    final beat = _pixelToBeat(local.dx);
+    final pitch = _pixelToPitch(local.dy);
+
+    if (widget.pianoRollController.isDrawToolActive &&
+        !widget.mutateController.isBusy) {
+      // 書き込みモード: ノートを作成
+      widget.mutateController.createNoteAt(beat, pitch);
+    } else if (widget.pianoRollController.isSelectToolActive) {
+      // 選択モード: タップした位置のノートを選択/解除
+      final notes = widget.songState.notesForTrack(
+        widget.pianoRollController.trackId,
+      );
+      final tappedNote = _findNoteAtPosition(notes, beat, pitch);
+      if (tappedNote != null) {
+        final current = widget.pianoRollController.selectedNotes.toList();
+        if (current.any((n) => n.id == tappedNote.id)) {
+          current.removeWhere((n) => n.id == tappedNote.id);
+        } else {
+          current.add(tappedNote);
+        }
+        widget.pianoRollController.updateSelection(current);
+      } else {
+        widget.pianoRollController.clearSelection();
+      }
+    }
+  }
+
+  void _handlePanStart(DragStartDetails details) {
+    if (!widget.pianoRollController.isDrawToolActive) return;
+    final local = details.localPosition;
+    final beat = _pixelToBeat(local.dx);
+    final pitch = _pixelToPitch(local.dy);
+    final notes = widget.songState.notesForTrack(
+      widget.pianoRollController.trackId,
+    );
+    final note = _findNoteAtPosition(notes, beat, pitch);
+    if (note != null) {
+      _resizingNote = note;
+      _dragStartDx = local.dx;
+      widget.mutateController.startNoteResize(note);
+    }
+  }
+
+  void _handlePanUpdate(DragUpdateDetails details) {
+    if (_resizingNote == null || !widget.pianoRollController.isDrawToolActive) {
+      return;
+    }
+    final currentDx = details.localPosition.dx;
+    final deltaDx = currentDx - _dragStartDx;
+    final beatPerPixel = widget.timelineBeats / widget.timelineWidth;
+    final deltaBeats = beatPerPixel * deltaDx;
+    final rawEndBeat = _resizingNote!.startBeat + _resizingNote!.duration + deltaBeats;
+    final updated = widget.mutateController.updateNoteResize(
+      _resizingNote!,
+      rawEndBeat,
+    );
+    if (updated != null) {
+      setState(() {
+        _resizingNote = updated;
+      });
+    }
+  }
+
+  void _handlePanEnd(DragEndDetails details) {
+    if (_resizingNote != null) {
+      widget.mutateController.endNoteResize(_resizingNote!);
+      _resizingNote = null;
+    }
+  }
+
+  double _pixelToBeat(double x) {
+    return (x / widget.timelineWidth) * widget.timelineBeats;
+  }
+
+  int _pixelToPitch(double y) {
+    final row = (y / _kNoteRowHeight).floor();
+    return (_kTopPitch - row).clamp(0, 127);
+  }
+
+  Note? _findNoteAtPosition(List<Note> notes, double beat, int pitch) {
+    const tolerance = 0.5; // 拍の許容範囲
+    for (final note in notes) {
+      final pitchMatch = note.pitch == pitch;
+      final beatMatch = beat >= note.startBeat - tolerance &&
+          beat <= note.startBeat + note.duration + tolerance;
+      if (pitchMatch && beatMatch) {
+        return note;
+      }
+    }
+    return null;
+  }
+}
+
+/// ピアノロールの描画を担当するCustomPainter
+class PianoRollPainter extends CustomPainter {
+  PianoRollPainter({
+    required this.songState,
+    required this.pianoRollController,
+    required this.timelineBeats,
+    required this.timelineWidth,
+  });
+
+  final SongState songState;
+  final PianoRollController pianoRollController;
+  final double timelineBeats;
+  final double timelineWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final theme = _getThemeColors();
+    
+    // 背景を描画
+    _drawBackground(canvas, size, theme);
+    
+    // グリッドを描画
+    _drawGrid(canvas, size, theme);
+    
+    // ノートを描画
+    _drawNotes(canvas, size, theme);
+    
+    // 再生ヘッドを描画
+    _drawPlayhead(canvas, size, theme);
+  }
+
+  void _drawBackground(Canvas canvas, Size size, _ThemeColors theme) {
+    final backgroundPaint = Paint()..color = theme.backgroundColor;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), backgroundPaint);
+  }
+
+  void _drawGrid(Canvas canvas, Size size, _ThemeColors theme) {
+    final beatPerPixel = timelineWidth == 0 ? 0.0 : timelineBeats / timelineWidth;
+    
+    // 小節線（太線、4拍ごと）
+    final barPaint = Paint()
+      ..color = theme.barLineColor
+      ..strokeWidth = 2.0;
+    for (double beat = 0; beat <= timelineBeats; beat += 4.0) {
+      final x = (beat / timelineBeats) * timelineWidth;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), barPaint);
+    }
+    
+    // 拍線（細線、1拍ごと）
+    final beatPaint = Paint()
+      ..color = theme.beatLineColor
+      ..strokeWidth = 1.0;
+    for (double beat = 0; beat <= timelineBeats; beat += 1.0) {
+      if (beat % 4 != 0) { // 小節線と重複しないように
+        final x = (beat / timelineBeats) * timelineWidth;
+        canvas.drawLine(Offset(x, 0), Offset(x, size.height), beatPaint);
+      }
+    }
+    
+    // グリッド線（16分音符、SnapMode.gridの場合のみ）
+    if (pianoRollController.snapMode == SnapMode.grid) {
+      final gridPaint = Paint()
+        ..color = theme.gridLineColor
+        ..strokeWidth = 0.5;
+      for (double beat = 0; beat <= timelineBeats; beat += 0.25) {
+        if (beat % 1 != 0 && beat % 4 != 0) { // 拍線・小節線と重複しないように
+          final x = (beat / timelineBeats) * timelineWidth;
+          canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+        }
+      }
+    }
+    
+    // ピッチ行の横線
+    final rowPaint = Paint()
+      ..color = theme.rowLineColor
+      ..strokeWidth = 0.5;
+    final rows = (size.height / _kNoteRowHeight).ceil();
+    for (int row = 0; row <= rows; row++) {
+      final y = row * _kNoteRowHeight;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), rowPaint);
+    }
+  }
+
+  void _drawNotes(Canvas canvas, Size size, _ThemeColors theme) {
+    final notes = songState.notesForTrack(pianoRollController.trackId);
+    final selectedIds = pianoRollController.selectedNotes
+        .map((note) => note.id)
+        .toSet();
+    final previewIds = pianoRollController.previewNotes
+            ?.map((note) => note.id)
+            .toSet() ??
+        const <String>{};
+    
+    final beatPerPixel = timelineWidth == 0 ? 0.0 : timelineWidth / timelineBeats;
+    
+    for (final note in notes) {
+      final isSelected = selectedIds.contains(note.id);
+      final isPreview = previewIds.contains(note.id);
+      
+      final pitch = note.pitch;
+      final row = _kTopPitch - pitch;
+      final y = row * _kNoteRowHeight;
+      final x = (note.startBeat / timelineBeats) * timelineWidth;
+      final width = note.duration * beatPerPixel;
+      
+      final rect = Rect.fromLTWH(
+        x,
+        y,
+        width,
+        _kNoteRowHeight,
+      );
+      
+      // ノートの背景色
+      final backgroundColor = isPreview
+          ? theme.previewNoteColor
+          : isSelected
+              ? theme.selectedNoteColor
+              : theme.noteColor;
+      
+      final notePaint = Paint()..color = backgroundColor;
+      canvas.drawRect(rect, notePaint);
+      
+      // 選択されている場合は枠線を描画
+      if (isSelected) {
+        final borderPaint = Paint()
+          ..color = theme.selectedBorderColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+        canvas.drawRect(rect, borderPaint);
+      }
+    }
+  }
+
+  void _drawPlayhead(Canvas canvas, Size size, _ThemeColors theme) {
+    final playheadBeat = songState.playheadBeat.clamp(0.0, timelineBeats);
+    final x = (playheadBeat / timelineBeats) * timelineWidth;
+    
+    final playheadPaint = Paint()
+      ..color = theme.playheadColor
+      ..strokeWidth = 2.0;
+    canvas.drawLine(
+      Offset(x, 0),
+      Offset(x, size.height),
+      playheadPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(PianoRollPainter oldDelegate) {
+    // AnimatedBuilderが既に再描画をトリガーしているので、
+    // ここではタイムラインのサイズが変わった場合のみ再描画が必要
+    // ただし、songStateやpianoRollControllerの内容が変わった場合も
+    // AnimatedBuilderが再描画をトリガーするため、基本的には常にtrueを返す
+    // より細かい最適化として、実際に変更があった場合のみtrueを返す
+    if (oldDelegate.timelineBeats != timelineBeats ||
+        oldDelegate.timelineWidth != timelineWidth) {
+      return true;
+    }
+    
+    // 再生ヘッドの位置が変わった場合
+    if ((oldDelegate.songState.playheadBeat - songState.playheadBeat).abs() > 1e-6) {
+      return true;
+    }
+    
+    // ノートの数が変わった場合
+    final oldNotes = oldDelegate.songState.notesForTrack(pianoRollController.trackId);
+    final newNotes = songState.notesForTrack(pianoRollController.trackId);
+    if (oldNotes.length != newNotes.length) {
+      return true;
+    }
+    
+    // 選択状態が変わった場合
+    if (oldDelegate.pianoRollController.selectedNotes.length !=
+        pianoRollController.selectedNotes.length) {
+      return true;
+    }
+    
+    // プレビュー状態が変わった場合
+    final oldPreviewCount = oldDelegate.pianoRollController.previewNotes?.length ?? 0;
+    final newPreviewCount = pianoRollController.previewNotes?.length ?? 0;
+    if (oldPreviewCount != newPreviewCount) {
+      return true;
+    }
+    
+    // それ以外の場合は、AnimatedBuilderが再描画をトリガーするのでfalseを返す
+    // ただし、ノートの内容が変わった場合も検出する必要があるため、
+    // より細かい比較が必要な場合は常にtrueを返す方が安全
+    return false;
+  }
+
+  _ThemeColors _getThemeColors() {
+    // Material Designのテーマカラーを使用
+    // 実際のテーマにアクセスするには、BuildContextが必要ですが、
+    // CustomPainterでは直接アクセスできないため、デフォルトカラーを使用
+    return _ThemeColors(
+      backgroundColor: const Color(0xFFFAFAFA),
+      barLineColor: const Color(0xFF424242),
+      beatLineColor: const Color(0xFF757575),
+      gridLineColor: const Color(0xFFBDBDBD),
+      rowLineColor: const Color(0xFFE0E0E0),
+      noteColor: const Color(0xFF2196F3),
+      selectedNoteColor: const Color(0xFF1976D2),
+      selectedBorderColor: const Color(0xFF0D47A1),
+      previewNoteColor: const Color(0x66FF9800), // 半透明オレンジ
+      playheadColor: Colors.red,
+    );
+  }
+}
+
+class _ThemeColors {
+  _ThemeColors({
+    required this.backgroundColor,
+    required this.barLineColor,
+    required this.beatLineColor,
+    required this.gridLineColor,
+    required this.rowLineColor,
+    required this.noteColor,
+    required this.selectedNoteColor,
+    required this.selectedBorderColor,
+    required this.previewNoteColor,
+    required this.playheadColor,
+  });
+
+  final Color backgroundColor;
+  final Color barLineColor;
+  final Color beatLineColor;
+  final Color gridLineColor;
+  final Color rowLineColor;
+  final Color noteColor;
+  final Color selectedNoteColor;
+  final Color selectedBorderColor;
+  final Color previewNoteColor;
+  final Color playheadColor;
 }
