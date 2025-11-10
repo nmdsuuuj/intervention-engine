@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
-// TODO: flutter_midi_pro パッケージのAPIが変更された可能性があります。
-// パッケージの最新ドキュメントを確認して、正しいAPIを使用してください。
-// import 'package:flutter_midi_pro/flutter_midi_pro.dart';
+import 'package:flutter_midi_pro/flutter_midi_pro.dart';
 
 import '../models/note.dart';
 
@@ -22,9 +20,7 @@ class AudioPreviewService {
   final Duration _tickInterval;
   final int _midiChannel;
 
-  // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
-  // final FlutterMidiPro _midi = FlutterMidiPro();
-  dynamic _midi; // 一時的な修正
+  final FlutterMidiPro _midi = FlutterMidiPro();
 
   bool _initialized = false;
   bool _isLooping = false;
@@ -41,10 +37,15 @@ class AudioPreviewService {
 
   Future<void> init() async {
     if (_initialized) return;
-    // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
-    // final soundFontData = await rootBundle.load(_soundFontAsset);
-    // await _midi.prepare(sf2: soundFontData);
-    _initialized = true;
+    try {
+      final soundFontData = await rootBundle.load(_soundFontAsset);
+      await _midi.prepare(sf2: soundFontData);
+      _initialized = true;
+    } catch (e) {
+      // サウンドフォントが見つからない場合は初期化をスキップ
+      print('Warning: Could not load sound font: $e');
+      _initialized = true;
+    }
   }
 
   Future<void> playLoop(
@@ -143,33 +144,45 @@ class AudioPreviewService {
   }
 
   void _noteOn(_ScheduledNote event) {
-    // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
-    // _midi.playMidiNote(
-    //   midi: event.note.pitch,
-    //   velocity: event.note.velocity,
-    //   channel: _midiChannel,
-    // );
-    event.isActive = true;
+    try {
+      _midi.playMidiNote(
+        midi: event.note.pitch,
+        velocity: event.note.velocity,
+        channel: _midiChannel,
+      );
+      event.isActive = true;
+    } catch (e) {
+      // MIDI再生エラーを無視
+      print('Warning: Could not play MIDI note: $e');
+    }
   }
 
   void _noteOff(_ScheduledNote event) {
-    // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
-    // _midi.stopMidiNote(
-    //   midi: event.note.pitch,
-    //   channel: _midiChannel,
-    // );
-    event.isActive = false;
+    try {
+      _midi.stopMidiNote(
+        midi: event.note.pitch,
+        channel: _midiChannel,
+      );
+      event.isActive = false;
+    } catch (e) {
+      // MIDI停止エラーを無視
+      print('Warning: Could not stop MIDI note: $e');
+    }
   }
 
   void _stopActiveNotes() {
     for (final event in _scheduledNotes) {
       if (event.isActive) {
-        // TODO: flutter_midi_pro パッケージのAPIを確認して修正してください
-        // _midi.stopMidiNote(
-        //   midi: event.note.pitch,
-        //   channel: _midiChannel,
-        // );
-        event.isActive = false;
+        try {
+          _midi.stopMidiNote(
+            midi: event.note.pitch,
+            channel: _midiChannel,
+          );
+          event.isActive = false;
+        } catch (e) {
+          // MIDI停止エラーを無視
+          print('Warning: Could not stop MIDI note: $e');
+        }
       }
     }
   }

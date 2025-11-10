@@ -48,7 +48,7 @@ class _InterventionEngineAppState extends State<InterventionEngineApp> {
     _undoManager = UndoManager();
     _engine = InterventionEngine();
     _audioPreviewService = AudioPreviewService(
-      soundFontAsset: 'assets/sounds/placeholder.sf2',
+      soundFontAsset: 'assets/sounds/tim_gm.sf2',
     );
     _mutateController = MutateWorkflowController(
       pianoRollController: _pianoRollController,
