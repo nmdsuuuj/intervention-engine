@@ -1,0 +1,22 @@
+name: intervention_engine
+description: Prototype implementation for Intervention Engine step 4
+version: 0.1.0
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  collection: ^1.18.0
+  flutter_midi_pro: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/data/techniques.json
+    - assets/sounds/tim_gm.sf2
