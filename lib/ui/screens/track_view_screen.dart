@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../controllers/mutate_workflow_controller.dart';
+import '../../models/note.dart';
 import '../../models/snap_mode.dart';
 import '../../state/piano_roll_controller.dart';
 import '../../state/song_state.dart';
